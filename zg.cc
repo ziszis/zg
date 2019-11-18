@@ -1,5 +1,6 @@
 #include <cstdlib>
 #include <iostream>
+#include <memory>
 #include <optional>
 #include <string_view>
 #include <vector>
@@ -33,6 +34,20 @@ class FieldValue {
   mutable std::optional<int64_t> int_;
 };
 
+class Data {
+ public:
+  Data() {
+  }
+
+  void Process(const std::vector<FieldValue>& fields) {
+  }
+
+  void Render(std::ostream& os) {
+  }
+
+ private:
+};
+
 void SplitLine(std::string_view line, std::vector<FieldValue>* fields) {
   // Using for-loop instead of the more canonical `fields = absl::StrSplit(...)`
   // to avoid vector reallocations.
@@ -46,8 +61,11 @@ void SplitLine(std::string_view line, std::vector<FieldValue>* fields) {
 int main(int argc, char *argv[]) {
   std::string line;
   std::vector<FieldValue> fields;
+  Data data;
   while (std::getline(std::cin, line)) {
     SplitLine(line, &fields);
+    data.Process(fields);
   }
+  data.Render(std::cout);
   return 0;
 }
