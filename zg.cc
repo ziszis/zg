@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "absl/strings/numbers.h"
+#include "absl/strings/str_split.h"
 
 void Fail(std::string_view reason) {
   std::cerr << reason << std::endl;
@@ -32,6 +33,21 @@ class FieldValue {
   mutable std::optional<int64_t> int_;
 };
 
-int main(int argc, char* argv[]) {
+void SplitLine(std::string_view line, std::vector<FieldValue>* fields) {
+  // Using for-loop instead of the more canonical `fields = absl::StrSplit(...)`
+  // to avoid vector reallocations.
+  fields->clear();
+  for (auto field :
+       absl::StrSplit(line, absl::ByAnyChar(" \t"), absl::SkipWhitespace())) {
+    fields->emplace_back(field);
+  }
+}
+
+int main(int argc, char *argv[]) {
+  std::string line;
+  std::vector<FieldValue> fields;
+  while (std::getline(std::cin, line)) {
+    SplitLine(line, &fields);
+  }
   return 0;
 }
