@@ -5,9 +5,9 @@
 #include <string_view>
 #include <vector>
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_split.h"
-#include "absl/container/flat_hash_map.h"
 
 void Fail(std::string_view reason) {
   std::cerr << reason << std::endl;
@@ -35,52 +35,29 @@ class FieldValue {
   mutable std::optional<int64_t> int_;
 };
 
-class Aggregator {
+class CountAggregator {
  public:
-  virtual ~Aggregator() {}
-  virtual size_t StateSize() const = 0;
-  virtual void Init(char* state) = 0;
-  virtual void Push(const FieldValue&, char* state) = 0;
-  virtual void Print(const char* state, std::string* out) const = 0;
-};
-
-class CountAggregator : public Aggregator {
-  size_t StateSize() const override { return 8; }
-
-  void Init(char* state) override {
-    *reinterpret_cast<int64_t*>(state) = 0;
-  }
-
-  void Push(const FieldValue&, char* state) override {
-    ++(*reinterpret_cast<int64_t*>(state));
-  }
-
-  void Print(const char* state, std::string* out) const override {
-    absl::StrAppend(out, *reinterpret_cast<const int64_t*>(state));
+  using State = int64_t;
+  void Init(State* state) const { *state = 0; }
+  void Push(const FieldValue&, State* state) const { ++*state; }
+  void Print(State state, std::string* out) const {
+    absl::StrAppend(out, state);
   }
 };
 
-class SampleAggregator : public Aggregator {
-  size_t StateSize() const override { return 4; }
-  void Init(char* state) override {}
-  void Push(const FieldValue&, char* state) override {}
-  void Print(const char* state, std::string* out) const override {}
-};
-
-class Data {
+template <class Aggregator>
+class SingleAggregatorTable {
  public:
-  Data() {
-    agg_.push_back(std::make_unique<CountAggregator>());
-    state_offset_.push_back(0);
-  }
+  SingleAggregatorTable(int key_field, int value_field,
+                        Aggregator agg = Aggregator())
+      : key_field_(key_field), value_field_(value_field), agg_(agg) {}
 
-  void Process(const std::vector<FieldValue>& fields) {
-    auto [it, inserted] = rows_.try_emplace(fields[1].AsString());
-    char* row = it->second;
+  void AddRow(const std::vector<FieldValue>& fields) {
+    auto [it, inserted] = rows_.try_emplace(fields[key_field_].AsString());
     if (inserted) {
-      agg_[0]->Init(row);
+      agg_.Init(&it->second);
     }
-    agg_[0]->Push(fields[1], row);
+    agg_.Push(fields[value_field_], &it->second);
   }
 
   void Render() {
@@ -88,11 +65,11 @@ class Data {
     for (const auto& [key, value] : rows_) {
       buffer.append(key);
       buffer.push_back('\t');
-      const char* row = value;
-      agg_[0]->Print(row, &buffer);
+      agg_.Print(value, &buffer);
       buffer.push_back('\n');
       if (buffer.size() > 1 << 15) {
-        if (std::fwrite(buffer.data(), 1, buffer.size(), stdout) != buffer.size()) {
+        if (std::fwrite(buffer.data(), 1, buffer.size(), stdout) !=
+            buffer.size()) {
           Fail("Write failed");
         }
         buffer.clear();
@@ -104,11 +81,10 @@ class Data {
   }
 
  private:
-  using Row = char[8];
-  absl::flat_hash_map<std::string, Row> rows_;
-
-  std::vector<size_t> state_offset_;
-  std::vector<std::unique_ptr<Aggregator>> agg_;
+  absl::flat_hash_map<std::string, typename Aggregator::State> rows_;
+  int key_field_;
+  int value_field_;
+  Aggregator agg_;
 };
 
 void SplitLine(std::string_view line, std::vector<FieldValue>* fields) {
@@ -121,7 +97,7 @@ void SplitLine(std::string_view line, std::vector<FieldValue>* fields) {
   }
 }
 
-template<class LineFn>
+template <class LineFn>
 void ForEachInputLine(LineFn lineFn) {
   std::string buffer(16384, '\0');
   char* begin = buffer.data();
@@ -156,13 +132,13 @@ void ForEachInputLine(LineFn lineFn) {
   }
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
   std::vector<FieldValue> fields;
-  Data data;
+  SingleAggregatorTable<CountAggregator> table(1, 1);
   ForEachInputLine([&](std::string_view line) {
     SplitLine(line, &fields);
-    data.Process(fields);
+    table.AddRow(fields);
   });
-  data.Render();
+  table.Render();
   return 0;
 }
