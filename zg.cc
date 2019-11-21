@@ -174,12 +174,22 @@ void ForEachInputLine(LineFn lineFn) {
 }
 
 std::unique_ptr<Table> ParseSpec(absl::string_view spec) {
-  return std::make_unique<SingleAggregatorTable<CountAggregator>>(1, 1);
+  if (spec == "k2c") {
+    return std::make_unique<SingleAggregatorTable<CountAggregator>>(1, 1);
+  } else if (spec == "k1c") {
+    return std::make_unique<SingleAggregatorTable<CountAggregator>>(0, 0);
+  } else if (spec == "c") {
+    return std::make_unique<NoGroupingTable<CountAggregator>>(0);
+  } else {
+    Fail("Unsupported spec");
+    return nullptr;
+  }
 }
 
 int main(int argc, char* argv[]) {
   std::vector<FieldValue> fields;
-  std::unique_ptr<Table> table = ParseSpec("kc");
+  if (argc < 2) Fail("Need spec");
+  std::unique_ptr<Table> table = ParseSpec(argv[1]);
   ForEachInputLine([&](std::string_view line) {
     SplitLine(line, &fields);
     table->PushRow(fields);
