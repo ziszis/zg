@@ -128,13 +128,29 @@ class SingleAggregatorTable : public Table {
   Aggregator agg_;
 };
 
-void SplitLine(std::string_view line, std::vector<FieldValue>* fields) {
-  // Using for-loop instead of the more canonical `fields = absl::StrSplit(...)`
-  // to avoid vector reallocations.
+void SplitLine(const char* line, const char* end,
+               std::vector<FieldValue>* fields) {
   fields->clear();
-  for (auto field :
-       absl::StrSplit(line, absl::ByAnyChar(" \t"), absl::SkipWhitespace())) {
-    fields->emplace_back(field);
+  const char* begin = line;
+  while (true) {
+    while (true) {
+      if (begin == end) return;
+      if (*begin != ' ' && *begin != '\t') break;
+      ++begin;
+    }
+    const char* p = begin;
+    while (true) {
+      if (p == end) {
+        fields->emplace_back(std::string_view(begin, p - begin));
+        return;
+      }
+      if (*p == ' ' || *p == '\t') {
+        fields->emplace_back(std::string_view(begin, p - begin));
+        begin = p + 1;
+        break;
+      }
+      ++p;
+    }
   }
 }
 
@@ -151,7 +167,7 @@ void ForEachInputLine(LineFn lineFn) {
     while (true) {
       char* p = static_cast<char*>(memchr(begin, '\n', bufferLeft));
       if (p != nullptr) {
-        lineFn(std::string_view(begin, p - begin));
+        lineFn(begin, p);
         ++p;
         bufferLeft -= p - begin;
         begin = p;
@@ -165,7 +181,7 @@ void ForEachInputLine(LineFn lineFn) {
         break;
       } else {
         if (bufferLeft != 0) {
-          lineFn(std::string_view(begin, bufferLeft));
+          lineFn(begin, begin + bufferLeft);
         }
         return;
       }
@@ -190,8 +206,8 @@ int main(int argc, char* argv[]) {
   std::vector<FieldValue> fields;
   if (argc < 2) Fail("Need spec");
   std::unique_ptr<Table> table = ParseSpec(argv[1]);
-  ForEachInputLine([&](std::string_view line) {
-    SplitLine(line, &fields);
+  ForEachInputLine([&](const char* begin, const char* end) {
+    SplitLine(begin, end, &fields);
     table->PushRow(fields);
   });
   table->Render();
