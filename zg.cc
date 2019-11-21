@@ -45,14 +45,64 @@ class CountAggregator {
   }
 };
 
+class OutputBuffer {
+ public:
+  std::string* raw() { return &buf_; }
+  void MaybeFlush() {
+    if (buf_.size() > 1 << 15) Flush();
+  }
+  ~OutputBuffer() { Flush(); }
+
+ private:
+  void Flush() {
+    if (std::fwrite(buf_.data(), 1, buf_.size(), stdout) != buf_.size()) {
+      Fail("Write failed");
+    }
+    buf_.clear();
+  }
+
+  std::string buf_;
+};
+
+class Table {
+ public:
+  virtual ~Table() {}
+  virtual void PushRow(const std::vector<FieldValue>& fields) = 0;
+  virtual void Render() = 0;
+};
+
 template <class Aggregator>
-class SingleAggregatorTable {
+class NoGroupingTable : public Table {
+ public:
+  NoGroupingTable(int value_field, Aggregator agg = Aggregator())
+      : value_field_(value_field), agg_(agg) {
+    agg_.Init(&state_);
+  }
+
+  void PushRow(const std::vector<FieldValue>& fields) override {
+    agg_.Push(fields[value_field_], &state_);
+  }
+
+  void Render() override {
+    OutputBuffer buffer;
+    agg_.Print(state_, buffer.raw());
+    buffer.raw()->push_back('\n');
+  }
+
+ private:
+  typename Aggregator::State state_;
+  int value_field_;
+  Aggregator agg_;
+};
+
+template <class Aggregator>
+class SingleAggregatorTable : public Table {
  public:
   SingleAggregatorTable(int key_field, int value_field,
                         Aggregator agg = Aggregator())
       : key_field_(key_field), value_field_(value_field), agg_(agg) {}
 
-  void AddRow(const std::vector<FieldValue>& fields) {
+  void PushRow(const std::vector<FieldValue>& fields) override {
     auto [it, inserted] = rows_.try_emplace(fields[key_field_].AsString());
     if (inserted) {
       agg_.Init(&it->second);
@@ -60,23 +110,14 @@ class SingleAggregatorTable {
     agg_.Push(fields[value_field_], &it->second);
   }
 
-  void Render() {
-    std::string buffer;
+  void Render() override {
+    OutputBuffer buffer;
     for (const auto& [key, value] : rows_) {
-      buffer.append(key);
-      buffer.push_back('\t');
-      agg_.Print(value, &buffer);
-      buffer.push_back('\n');
-      if (buffer.size() > 1 << 15) {
-        if (std::fwrite(buffer.data(), 1, buffer.size(), stdout) !=
-            buffer.size()) {
-          Fail("Write failed");
-        }
-        buffer.clear();
-      }
-    }
-    if (std::fwrite(buffer.data(), 1, buffer.size(), stdout) != buffer.size()) {
-      Fail("Write failed");
+      buffer.raw()->append(key);
+      buffer.raw()->push_back('\t');
+      agg_.Print(value, buffer.raw());
+      buffer.raw()->push_back('\n');
+      buffer.MaybeFlush();
     }
   }
 
@@ -132,13 +173,17 @@ void ForEachInputLine(LineFn lineFn) {
   }
 }
 
+std::unique_ptr<Table> ParseSpec(absl::string_view spec) {
+  return std::make_unique<SingleAggregatorTable<CountAggregator>>(1, 1);
+}
+
 int main(int argc, char* argv[]) {
   std::vector<FieldValue> fields;
-  SingleAggregatorTable<CountAggregator> table(1, 1);
+  std::unique_ptr<Table> table = ParseSpec("kc");
   ForEachInputLine([&](std::string_view line) {
     SplitLine(line, &fields);
-    table.AddRow(fields);
+    table->PushRow(fields);
   });
-  table.Render();
+  table->Render();
   return 0;
 }
