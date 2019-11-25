@@ -47,6 +47,23 @@ class CountAggregator {
   }
 };
 
+class IntSumAggregator {
+ public:
+  explicit IntSumAggregator(int field) : field_(field) {}
+
+  using State = int64_t;
+  void Init(State* state) const { *state = 0; }
+  void Push(const InputRow& row, State* state) const {
+    *state += row[field_].AsInt64();
+  }
+  void Print(State state, std::string* out) const {
+    absl::StrAppend(out, state);
+  }
+
+ private:
+  int field_;
+};
+
 class OutputBuffer {
  public:
   std::string* raw() { return &buf_; }
@@ -190,6 +207,8 @@ std::unique_ptr<Table> ParseSpec(absl::string_view spec) {
     return std::make_unique<SingleAggregatorTable<CountAggregator>>(1);
   } else if (spec == "k1c") {
     return std::make_unique<SingleAggregatorTable<CountAggregator>>(0);
+  } else if (spec == "k2s1") {
+    return std::make_unique<SingleAggregatorTable<IntSumAggregator>>(1, IntSumAggregator(0));
   } else if (spec == "c") {
     return std::make_unique<NoGroupingTable<CountAggregator>>();
   } else {
