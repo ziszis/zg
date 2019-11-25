@@ -35,11 +35,13 @@ class FieldValue {
   mutable std::optional<int64_t> int_;
 };
 
+using InputRow = std::vector<FieldValue>;
+
 class CountAggregator {
  public:
   using State = int64_t;
   void Init(State* state) const { *state = 0; }
-  void Push(const FieldValue&, State* state) const { ++*state; }
+  void Push(const InputRow&, State* state) const { ++*state; }
   void Print(State state, std::string* out) const {
     absl::StrAppend(out, state);
   }
@@ -67,21 +69,18 @@ class OutputBuffer {
 class Table {
  public:
   virtual ~Table() {}
-  virtual void PushRow(const std::vector<FieldValue>& fields) = 0;
+  virtual void PushRow(const InputRow& row) = 0;
   virtual void Render() = 0;
 };
 
 template <class Aggregator>
 class NoGroupingTable : public Table {
  public:
-  NoGroupingTable(int value_field, Aggregator agg = Aggregator())
-      : value_field_(value_field), agg_(agg) {
+  explicit NoGroupingTable(Aggregator agg = Aggregator()) : agg_(agg) {
     agg_.Init(&state_);
   }
 
-  void PushRow(const std::vector<FieldValue>& fields) override {
-    agg_.Push(fields[value_field_], &state_);
-  }
+  void PushRow(const InputRow& row) override { agg_.Push(row, &state_); }
 
   void Render() override {
     OutputBuffer buffer;
@@ -98,16 +97,15 @@ class NoGroupingTable : public Table {
 template <class Aggregator>
 class SingleAggregatorTable : public Table {
  public:
-  SingleAggregatorTable(int key_field, int value_field,
-                        Aggregator agg = Aggregator())
-      : key_field_(key_field), value_field_(value_field), agg_(agg) {}
+  SingleAggregatorTable(int key_field, Aggregator agg = Aggregator())
+      : key_field_(key_field), agg_(agg) {}
 
-  void PushRow(const std::vector<FieldValue>& fields) override {
-    auto [it, inserted] = rows_.try_emplace(fields[key_field_].AsString());
+  void PushRow(const InputRow& row) override {
+    auto [it, inserted] = rows_.try_emplace(row[key_field_].AsString());
     if (inserted) {
       agg_.Init(&it->second);
     }
-    agg_.Push(fields[value_field_], &it->second);
+    agg_.Push(row, &it->second);
   }
 
   void Render() override {
@@ -124,13 +122,11 @@ class SingleAggregatorTable : public Table {
  private:
   absl::flat_hash_map<std::string, typename Aggregator::State> rows_;
   int key_field_;
-  int value_field_;
   Aggregator agg_;
 };
 
-void SplitLine(const char* line, const char* end,
-               std::vector<FieldValue>* fields) {
-  fields->clear();
+void SplitLine(const char* line, const char* end, InputRow* row) {
+  row->clear();
   const char* begin = line;
   while (true) {
     while (true) {
@@ -141,11 +137,11 @@ void SplitLine(const char* line, const char* end,
     const char* p = begin;
     while (true) {
       if (p == end) {
-        fields->emplace_back(std::string_view(begin, p - begin));
+        row->emplace_back(std::string_view(begin, p - begin));
         return;
       }
       if (*p == ' ' || *p == '\t') {
-        fields->emplace_back(std::string_view(begin, p - begin));
+        row->emplace_back(std::string_view(begin, p - begin));
         begin = p + 1;
         break;
       }
@@ -191,11 +187,11 @@ void ForEachInputLine(LineFn lineFn) {
 
 std::unique_ptr<Table> ParseSpec(absl::string_view spec) {
   if (spec == "k2c") {
-    return std::make_unique<SingleAggregatorTable<CountAggregator>>(1, 1);
+    return std::make_unique<SingleAggregatorTable<CountAggregator>>(1);
   } else if (spec == "k1c") {
-    return std::make_unique<SingleAggregatorTable<CountAggregator>>(0, 0);
+    return std::make_unique<SingleAggregatorTable<CountAggregator>>(0);
   } else if (spec == "c") {
-    return std::make_unique<NoGroupingTable<CountAggregator>>(0);
+    return std::make_unique<NoGroupingTable<CountAggregator>>();
   } else {
     Fail("Unsupported spec");
     return nullptr;
@@ -203,12 +199,12 @@ std::unique_ptr<Table> ParseSpec(absl::string_view spec) {
 }
 
 int main(int argc, char* argv[]) {
-  std::vector<FieldValue> fields;
+  InputRow row;
   if (argc < 2) Fail("Need spec");
   std::unique_ptr<Table> table = ParseSpec(argv[1]);
   ForEachInputLine([&](const char* begin, const char* end) {
-    SplitLine(begin, end, &fields);
-    table->PushRow(fields);
+    SplitLine(begin, end, &row);
+    table->PushRow(row);
   });
   table->Render();
   return 0;
