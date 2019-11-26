@@ -11,6 +11,11 @@ class FieldValue {
   explicit FieldValue(std::string_view value) : value_(value) {}
   std::string_view AsString() const { return value_; }
   int64_t AsInt64() const;
+  double AsDouble() const;
+
+  template<class T> T As() const;
+  template<> int64_t As<int64_t>() const { return AsInt64(); }
+  template<> double As<double>() const { return AsDouble(); }
 
  private:
   std::string_view value_;

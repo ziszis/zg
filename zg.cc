@@ -201,7 +201,10 @@ void ParseSpec(char* spec[], std::vector<int>* key_fields, Fn fn) {
     fn(CountAggregator());
   } else if (spec[1] == std::string("k2s1")) {
     key_fields->push_back(1);
-    fn(IntSumAggregator(0));
+    fn(SumAggregator<int64_t>(0));
+  } else if (spec[1] == std::string("k2sf1")) {
+    key_fields->push_back(1);
+    fn(SumAggregator<double>(0));
   } else if (spec[1] == std::string("c")) {
     fn(CountAggregator());
   } else {
