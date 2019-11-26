@@ -7,7 +7,7 @@
 class CountAggregator {
  public:
   using State = int64_t;
-  void Init(State* state) const { *state = 0; }
+  State GetDefault() const { return 0; }
   void Push(const InputRow&, State* state) const { ++*state; }
   void Print(State state, std::string* out) const {
     absl::StrAppend(out, state);
@@ -19,7 +19,7 @@ class IntSumAggregator {
   explicit IntSumAggregator(int field) : field_(field) {}
 
   using State = int64_t;
-  void Init(State* state) const { *state = 0; }
+  State GetDefault() const { return 0; }
   void Push(const InputRow& row, State* state) const {
     *state += row[field_].AsInt64();
   }
