@@ -1,9 +1,9 @@
 #ifndef GITHUB_ZISZIS_ZG_TABLE_INCLUDED
 #define GITHUB_ZISZIS_ZG_TABLE_INCLUDED
 
+#include "absl/container/flat_hash_map.h"
 #include "output.h"
 #include "types.h"
-#include "absl/container/flat_hash_map.h"
 
 class AggregationState {
   template <class Value> class NoKey;
@@ -78,4 +78,3 @@ class Table {
 };
 
 #endif  // GITHUB_ZISZIS_ZG_TABLE_INCLUDED
-

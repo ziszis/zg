@@ -25,11 +25,43 @@ cc_library(
 )
 
 cc_library(
+    name = 'multi-aggregation',
+    hdrs = ['multi-aggregation.h'],
+    srcs = ['multi-aggregation.cc'],
+    deps = [
+        ':base',
+        ':table',
+    ],
+)
+
+cc_library(
     name = 'output',
     hdrs = ['output.h'],
     srcs = ['output.cc'],
     deps = [
         ':base',
+    ],
+)
+
+cc_library(
+    name = 'single-aggregation',
+    hdrs = ['single-aggregation.h'],
+    deps = [
+        ':base',
+        ':table',
+    ],
+)
+
+cc_library(
+    name = 'spec',
+    hdrs = ['spec.h'],
+    srcs = ['spec.cc'],
+    deps = [
+        ':aggregators',
+        ':base',
+        ':table',
+        ':single-aggregation',
+        ':multi-aggregation',
     ],
 )
 
@@ -57,12 +89,9 @@ cc_binary(
     name = 'zg',
     srcs = ['zg.cc'],
     deps = [
-        ':aggregators',
         ':base',
         ':input',
-        ':output',
+        ':spec',
         ':types',
-        ':table',
-        '@com_google_absl//absl/strings',
     ],
 )

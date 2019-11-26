@@ -16,7 +16,7 @@ class CountAggregator {
   }
 };
 
-template<class Value>
+template <class Value>
 class SumAggregator {
  public:
   explicit SumAggregator(int field) : field_(field) {}
@@ -34,7 +34,7 @@ class SumAggregator {
   int field_;
 };
 
-template<class Value>
+template <class Value>
 class MinAggregator {
  public:
   explicit MinAggregator(int field) : field_(field) {}
@@ -52,7 +52,7 @@ class MinAggregator {
   int field_;
 };
 
-template<class Value>
+template <class Value>
 class MaxAggregator {
  public:
   explicit MaxAggregator(int field) : field_(field) {}
