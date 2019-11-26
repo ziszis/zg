@@ -25,6 +25,25 @@ cc_library(
 )
 
 cc_library(
+    name = 'output',
+    hdrs = ['output.h'],
+    srcs = ['output.cc'],
+    deps = [
+        ':base',
+    ],
+)
+
+cc_library(
+    name = 'table',
+    hdrs = ['table.h'],
+    deps = [
+        ':output',
+        ':types',
+        '@com_google_absl//absl/container:flat_hash_map',
+    ],
+)
+
+cc_library(
     name = 'types',
     hdrs = ['types.h'],
     srcs = ['types.cc'],
@@ -41,8 +60,9 @@ cc_binary(
         ':aggregators',
         ':base',
         ':input',
+        ':output',
         ':types',
-        '@com_google_absl//absl/container:flat_hash_map',
+        ':table',
         '@com_google_absl//absl/strings',
     ],
 )

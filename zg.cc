@@ -2,85 +2,12 @@
 #include <string>
 #include <string_view>
 
-#include "absl/container/flat_hash_map.h"
 #include "aggregators.h"
 #include "base.h"
 #include "input.h"
+#include "output.h"
+#include "table.h"
 #include "types.h"
-
-class OutputBuffer {
- public:
-  std::string* raw() { return &buf_; }
-  void MaybeFlush() {
-    if (buf_.size() > 1 << 15) Flush();
-  }
-  ~OutputBuffer() { Flush(); }
-
- private:
-  void Flush() {
-    if (std::fwrite(buf_.data(), 1, buf_.size(), stdout) != buf_.size()) {
-      Fail("Write failed");
-    }
-    buf_.clear();
-  }
-
-  std::string buf_;
-};
-
-class AggregationState {
- public:
-  template<class Value>
-  class NoKey {
-   public:
-    explicit NoKey(Value value) : value_(std::move(value)) {}
-    Value& state(const InputRow&) { return value_; }
-
-    template <class Fn>
-    void Render(OutputBuffer* out, Fn fn) const {
-      fn(value_);
-    }
-
-   private:
-    Value value_;
-  };
-
-  template <class Value>
-  class OneKey {
-   public:
-    OneKey(int key_field, Value default_value)
-        : key_field_(key_field), default_(std::move(default_value)) {}
-
-    Value& state(const InputRow& input) {
-      return state_.try_emplace(input[key_field_].AsString(), default_)
-          .first->second;
-    }
-
-    template <class Fn>
-    void Render(OutputBuffer* out, Fn fn) const {
-      for (const auto& [key, value] : state_) {
-        out->raw()->append(key);
-        out->raw()->push_back('\t');
-        fn(value);
-        out->raw()->push_back('\n');
-        out->MaybeFlush();
-      }
-    }
-
-   private:
-    absl::flat_hash_map<std::string, Value> state_;
-    int key_field_;
-    Value default_;
-  };
-
- private:
-};
-
-class Table {
- public:
-  virtual ~Table() {}
-  virtual void PushRow(const InputRow& row) = 0;
-  virtual void Render() = 0;
-};
 
 template <class Aggregator, class State>
 class SingleAggregatorTable : public Table {
@@ -104,38 +31,211 @@ class SingleAggregatorTable : public Table {
   Aggregator agg_;
 };
 
-template <class A, class S>
-auto MakeSingleAggregatorTable(A a, S s) {
-  return std::make_unique<SingleAggregatorTable<A, S>>(std::move(a),
-                                                       std::move(s));
+template <class A, class StateFactory>
+auto MakeSingleAggregatorTable(A a, StateFactory sf) {
+  auto state = sf(a.GetDefault());
+  return std::make_unique<SingleAggregatorTable<A, decltype(state)>>(
+      std::move(a), std::move(state));
 }
 
-std::unique_ptr<Table> ParseSpec(absl::string_view spec) {
-  if (spec == "k2c") {
+template <class A>
+std::unique_ptr<Table> MakeSingleAggregatorTable(
+    const std::vector<int>& key_fields, A a) {
+  if (key_fields.size() == 0) {
+    return MakeSingleAggregatorTable(std::move(a),
+                                     AggregationState::NoKeyFactory());
+  } else if (key_fields.size() == 1) {
     return MakeSingleAggregatorTable(
-        CountAggregator(),
-        AggregationState::OneKey<CountAggregator::State>(1, 0));
-  } else if (spec == "k1c") {
-    return MakeSingleAggregatorTable(
-        CountAggregator(),
-        AggregationState::OneKey<CountAggregator::State>(0, 0));
-  } else if (spec == "k2s1") {
-    return MakeSingleAggregatorTable(
-        IntSumAggregator(0),
-        AggregationState::OneKey<IntSumAggregator::State>(1, 0));
-  } else if (spec == "c") {
-    return MakeSingleAggregatorTable(
-        CountAggregator(), AggregationState::NoKey<CountAggregator::State>(0));
+        std::move(a), AggregationState::OneKeyFactory{key_fields[0]});
   } else {
-    Fail("Unsupported spec");
+    Fail("Multiple grouping keys not supported yet");
     return nullptr;
   }
+}
+
+class AggregatorInterface {
+ public:
+  virtual ~AggregatorInterface() {}
+  virtual size_t StateSize() const = 0;
+  virtual void GetDefault(char* storage) const = 0;
+  virtual void Push(const InputRow& row, char* state) = 0;
+  virtual void Print(const char* state, std::string*) = 0;
+};
+using AggregatorPtr = std::unique_ptr<AggregatorInterface>;
+
+template <class A>
+class AggregatorWrapper : public AggregatorInterface {
+ public:
+  using State = typename A::State;
+  explicit AggregatorWrapper(A a) : a_(std::move(a)) {}
+  size_t StateSize() const override {
+    constexpr size_t size = alignof(State);
+    static_assert((size & (size - 1)) == 0);
+    return size;
+  }
+  void GetDefault(char* storage) const override {
+    *reinterpret_cast<State*>(storage) = a_.GetDefault();
+  }
+  void Push(const InputRow& row, char* state) override {
+    a_.Push(row, reinterpret_cast<State*>(state));
+  }
+  void Print(const char* state, std::string* out) override {
+    a_.Print(*reinterpret_cast<const State*>(state), out);
+  }
+
+ private:
+  A a_;
+};
+
+template <class A>
+std::unique_ptr<AggregatorInterface> WrapAggregator(A a) {
+  return std::make_unique<AggregatorWrapper<A>>(std::move(a));
+}
+
+struct AggregatorField {
+  AggregatorPtr aggregator;
+  size_t state_offset;
+};
+
+template <class State>
+class MultiAggregatorTable : public Table {
+ public:
+  MultiAggregatorTable(State state, std::vector<AggregatorField> fields)
+      : state_(std::move(state)), fields_(std::move(fields)) {}
+
+  void PushRow(const InputRow& row) override {
+    char* state = state_.state(row);
+    for (const auto& f : fields_) {
+      f.aggregator->Push(row, state + f.state_offset);
+    }
+  }
+
+  void Render() override {
+    OutputBuffer buffer;
+    state_.Render(&buffer, [this, &buffer](const char* state) {
+      for (const auto& f : fields_) {
+        f.aggregator->Print(state + f.state_offset, buffer.raw());
+      }
+    });
+  }
+
+ private:
+  State state_;
+  std::vector<AggregatorField> fields_;
+};
+
+template <class S>
+auto MakeMultiAggregatorTable(S s, std::vector<AggregatorField> fields) {
+  return std::make_unique<MultiAggregatorTable<S>>(std::move(s),
+                                                   std::move(fields));
+}
+
+template <class StateFactory, int state_size>
+std::unique_ptr<Table> MakeMultiAggregatorTableWithSize(
+    StateFactory state_factory, std::vector<AggregatorField> fields) {
+  char dflt[state_size];
+  for (const auto& f : fields) f.aggregator->GetDefault(dflt + f.state_offset);
+  return MakeMultiAggregatorTable(state_factory(std::move(dflt)),
+                                  std::move(fields));
+}
+
+std::pair<size_t, std::vector<AggregatorField>> LayoutAggregatorState(
+    std::vector<AggregatorPtr> aggs) {
+  std::vector<AggregatorField> fields;
+  for (AggregatorPtr& agg : aggs) {
+    fields.emplace_back();
+    fields.back().state_offset = agg->StateSize();
+    fields.back().aggregator = std::move(agg);
+  }
+  std::sort(fields.begin(), fields.end(), [](const auto& a, const auto& b) {
+    return a.state_offset > b.state_offset;
+  });
+  size_t size = 0;
+  for (auto& f : fields) {
+    size_t this_size = f.state_offset;
+    f.state_offset += size;
+    size += this_size;
+  }
+  return {size, std::move(fields)};
+}
+
+template <class StateFactory>
+std::unique_ptr<Table> MakeMultiAggregatorTableWithStateFactory(
+    StateFactory state_factory, std::vector<AggregatorPtr> aggs) {
+  auto [total_size, fields] = LayoutAggregatorState(std::move(aggs));
+
+  if (total_size <= 8) {
+    return MakeMultiAggregatorTableWithSize<StateFactory, 8>(
+        std::move(state_factory), std::move(fields));
+  } else if (total_size <= 16) {
+    return MakeMultiAggregatorTableWithSize<StateFactory, 16>(
+        std::move(state_factory), std::move(fields));
+  } else {
+    Fail("Too much state");  // Add more branches.
+    return nullptr;
+  }
+}
+
+std::unique_ptr<Table> MakeMultiAggregatorTable(
+    const std::vector<int>& key_fields, std::vector<AggregatorPtr> fields) {
+  if (key_fields.size() == 0) {
+    return MakeMultiAggregatorTableWithStateFactory(
+        AggregationState::NoKeyFactory(), std::move(fields));
+  } else if (key_fields.size() == 1) {
+    return MakeMultiAggregatorTableWithStateFactory(
+        AggregationState::OneKeyFactory{key_fields[0]}, std::move(fields));
+  } else {
+    Fail("Multiple grouping keys not supported yet");
+    return nullptr;
+  }
+}
+
+template <class Fn>
+void ParseSpec(char* spec[], std::vector<int>* key_fields, Fn fn) {
+  key_fields->clear();
+  if (spec[1] == std::string("k2c")) {
+    key_fields->push_back(1);
+    fn(CountAggregator());
+  } else if (spec[1] == std::string("k1c")) {
+    key_fields->push_back(0);
+    fn(CountAggregator());
+  } else if (spec[1] == std::string("k2s1")) {
+    key_fields->push_back(1);
+    fn(IntSumAggregator(0));
+  } else if (spec[1] == std::string("c")) {
+    fn(CountAggregator());
+  } else {
+    Fail("Unsupported spec");
+  }
+}
+
+std::unique_ptr<Table> ParseSpec(char* spec[]) {
+  std::vector<int> key_fields;
+
+  int num_agg = 0;
+  ParseSpec(spec, &key_fields, [&](auto) { ++num_agg; });
+
+  std::unique_ptr<Table> result;
+  if (num_agg == 0) {
+    Fail("Not implemented");
+  } else if (num_agg == 1) {
+    ParseSpec(spec, &key_fields, [&](auto agg) {
+      result = MakeSingleAggregatorTable(key_fields, std::move(agg));
+    });
+  } else {
+    std::vector<AggregatorPtr> aggs;
+    ParseSpec(spec, &key_fields, [&](auto agg) {
+      aggs.push_back(WrapAggregator(std::move(agg)));
+    });
+    result = MakeMultiAggregatorTable(key_fields, std::move(aggs));
+  }
+  return result;
 }
 
 int main(int argc, char* argv[]) {
   InputRow row;
   if (argc < 2) Fail("Need spec");
-  std::unique_ptr<Table> table = ParseSpec(argv[1]);
+  std::unique_ptr<Table> table = ParseSpec(argv);
   ForEachInputLine([&](const char* begin, const char* end) {
     SplitLine(begin, end, &row);
     table->PushRow(row);
