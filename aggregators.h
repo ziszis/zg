@@ -24,7 +24,7 @@ class SumAggregator {
   using State = Value;
   State GetDefault() const { return 0; }
   void Push(const InputRow& row, State* state) const {
-    *state += row[field_].template As<Value>();
+    *state += Cast<Value>(row[field_]);
   }
   void Print(State state, std::string* out) const {
     absl::StrAppend(out, state);
@@ -42,7 +42,7 @@ class MinAggregator {
   using State = Value;
   State GetDefault() const { return std::numeric_limits<Value>::max(); }
   void Push(const InputRow& row, State* state) const {
-    *state = std::min(*state, row[field_].template As<Value>());
+    *state = std::min(*state, Cast<Value>(row[field_]));
   }
   void Print(State state, std::string* out) const {
     absl::StrAppend(out, state);
@@ -60,7 +60,7 @@ class MaxAggregator {
   using State = Value;
   State GetDefault() const { return std::numeric_limits<Value>::min(); }
   void Push(const InputRow& row, State* state) const {
-    *state = std::max(*state, row[field_].template As<Value>());
+    *state = std::max(*state, Cast<Value>(row[field_]));
   }
   void Print(State state, std::string* out) const {
     absl::StrAppend(out, state);

@@ -13,13 +13,22 @@ class FieldValue {
   int64_t AsInt64() const;
   double AsDouble() const;
 
-  template<class T> T As() const;
-  template<> int64_t As<int64_t>() const { return AsInt64(); }
-  template<> double As<double>() const { return AsDouble(); }
-
  private:
   std::string_view value_;
 };
+
+template <class T>
+T Cast(const FieldValue& field);
+
+template <>
+inline int64_t Cast<int64_t>(const FieldValue& field) {
+  return field.AsInt64();
+}
+
+template <>
+inline double Cast<double>(const FieldValue& field) {
+  return field.AsDouble();
+}
 
 using InputRow = std::vector<FieldValue>;
 
