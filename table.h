@@ -6,8 +6,10 @@
 #include "types.h"
 
 class AggregationState {
-  template <class Value> class NoKey;
-  template <class Value> class OneKey;
+  template <class Value>
+  class NoKey;
+  template <class Value>
+  class OneKey;
 
  public:
   struct NoKeyFactory {

@@ -11,9 +11,9 @@ template <class A>
 std::unique_ptr<Table> MakeSingleAggregatorTable(
     const std::vector<int>& key_fields, A a);
 
-//=========================================================================== 
+//===========================================================================
 // Implementation below
-//=========================================================================== 
+//===========================================================================
 
 template <class Aggregator, class State>
 class SingleAggregatorTable : public Table {
