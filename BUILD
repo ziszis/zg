@@ -1,8 +1,10 @@
 cc_library(
     name = 'aggregators',
     hdrs = ['aggregators.h'],
+    srcs = ['aggregators.cc'],
     deps = [
         ':base',
+        ':types',
         '@com_google_absl//absl/strings',
     ],
 )

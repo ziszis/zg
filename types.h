@@ -1,6 +1,7 @@
 #ifndef GITHUB_ZISZIS_ZG_TYPES_INCLUDED
 #define GITHUB_ZISZIS_ZG_TYPES_INCLUDED
 
+#include <optional>
 #include <string_view>
 #include <vector>
 
@@ -11,6 +12,7 @@ class FieldValue {
   explicit FieldValue(std::string_view value) : value_(value) {}
   std::string_view AsString() const { return value_; }
   int64_t AsInt64() const;
+  std::optional<int64_t> TryAsInt64() const;
   double AsDouble() const;
 
  private:

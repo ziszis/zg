@@ -26,11 +26,11 @@ class ShorthandParser {
       } else if (TryConsume('c')) {
         fn_(CountAggregator());
       } else if (TryConsume('s')) {
-        fn_(SumAggregator<int64_t>(ConsumeInt() - 1));
+        WithTypeAndField<SumAggregator>();
       } else if (TryConsume('m')) {
-        fn_(MinAggregator<int64_t>(ConsumeInt() - 1));
+        WithTypeAndField<MinAggregator>();
       } else if (TryConsume('M')) {
-        fn_(MaxAggregator<int64_t>(ConsumeInt() - 1));
+        WithTypeAndField<MaxAggregator>();
       } else {
         Fail("Unrecognized operation");
       }
@@ -56,6 +56,17 @@ class ShorthandParser {
     }
   }
 
+  template <template <class V> class A>
+  void WithTypeAndField() {
+    if (TryConsume('i')) {
+      fn_(A<NativeNum<int64_t>>(ConsumeInt() - 1));
+    } else if (TryConsume('d')) {
+      fn_(A<NativeNum<double>>(ConsumeInt() - 1));
+    } else {
+      fn_(A<Numeric>(ConsumeInt() - 1));
+    }
+  }
+
   const char* it_;
   const char* end_;
   std::vector<int>* key_fields_;
@@ -76,11 +87,11 @@ class Parser {
       } else if (TryConsume("count")) {
         fn_(CountAggregator());
       } else if (TryConsume("sum")) {
-        fn_(SumAggregator<int64_t>(ConsumeInt() - 1));
+        WithTypeAndField<SumAggregator>();
       } else if (TryConsume("min")) {
-        fn_(MinAggregator<int64_t>(ConsumeInt() - 1));
+        WithTypeAndField<MinAggregator>();
       } else if (TryConsume("max")) {
-        fn_(MaxAggregator<int64_t>(ConsumeInt() - 1));
+        WithTypeAndField<MaxAggregator>();
       } else {
         ShorthandParser<Fn>(*it_++, key_fields_, fn_).Spec();
       }
@@ -104,6 +115,17 @@ class Parser {
     }
     ++it_;
     return result;
+  }
+
+  template <template <class V> class A>
+  void WithTypeAndField() {
+    if (TryConsume("int")) {
+      fn_(A<NativeNum<int64_t>>(ConsumeInt() - 1));
+    } else if (TryConsume("double")) {
+      fn_(A<NativeNum<double>>(ConsumeInt() - 1));
+    } else {
+      fn_(A<Numeric>(ConsumeInt() - 1));
+    }
   }
 
   std::vector<std::string>::const_iterator it_;
