@@ -35,9 +35,10 @@ class AggregatorWrapper : public AggregatorInterface {
   using State = typename A::State;
   explicit AggregatorWrapper(A a) : a_(std::move(a)) {}
   size_t StateSize() const override {
-    constexpr size_t size = alignof(State);
+    constexpr size_t size = sizeof(State);
     // Aggregator state layout depends on state sizes of individual agg
     static_assert((size & (size - 1)) == 0);
+    static_assert(size % alignof(State) == 0);
     return size;
   }
   void GetDefault(char* storage) const override {
