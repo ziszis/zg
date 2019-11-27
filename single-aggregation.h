@@ -9,7 +9,7 @@
 
 template <class A>
 std::unique_ptr<Table> MakeSingleAggregatorTable(
-    const std::vector<int>& key_fields, A a);
+    const std::vector<AggregationState::Key>& keys, A a);
 
 //===========================================================================
 // Implementation below
@@ -28,7 +28,7 @@ class SingleAggregatorTable : public Table {
   void Render() override {
     OutputBuffer buffer;
     state_.Render(&buffer, [this, &buffer](const auto& value) {
-      agg_.Print(value, buffer.raw());
+      agg_.Print(value, &buffer);
     });
   }
 
@@ -46,13 +46,13 @@ auto MakeSingleAggregatorTable(A a, StateFactory sf) {
 
 template <class A>
 std::unique_ptr<Table> MakeSingleAggregatorTable(
-    const std::vector<int>& key_fields, A a) {
-  if (key_fields.size() == 0) {
+    const std::vector<AggregationState::Key>& keys, A a) {
+  if (keys.size() == 0) {
     return MakeSingleAggregatorTable(std::move(a),
                                      AggregationState::NoKeyFactory());
-  } else if (key_fields.size() == 1) {
-    return MakeSingleAggregatorTable(
-        std::move(a), AggregationState::OneKeyFactory{key_fields[0]});
+  } else if (keys.size() == 1) {
+    return MakeSingleAggregatorTable(std::move(a),
+                                     AggregationState::OneKeyFactory{keys[0]});
   } else {
     Fail("Multiple grouping keys not supported yet");
     return nullptr;

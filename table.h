@@ -12,6 +12,12 @@ class AggregationState {
   class OneKey;
 
  public:
+  struct Key {
+    Key(int field_, int column_) : field(field_), column(column_) {}
+    int field;
+    int column;
+  };
+
   struct NoKeyFactory {
     template <class Value>
     NoKey<Value> operator()(Value dflt) const {
@@ -20,10 +26,10 @@ class AggregationState {
   };
 
   struct OneKeyFactory {
-    int key_field;
+    Key key;
     template <class Value>
     OneKey<Value> operator()(Value dflt) const {
-      return OneKey<Value>(key_field, std::move(dflt));
+      return OneKey<Value>(key, std::move(dflt));
     }
   };
 
@@ -37,7 +43,7 @@ class AggregationState {
     template <class Fn>
     void Render(OutputBuffer* out, Fn fn) const {
       fn(value_);
-      out->raw()->push_back('\n');
+      out->EndLine();
     }
 
    private:
@@ -47,28 +53,26 @@ class AggregationState {
   template <class Value>
   class OneKey {
    public:
-    OneKey(int key_field, Value default_value)
-        : key_field_(key_field), default_(std::move(default_value)) {}
+    OneKey(Key key, Value default_value)
+        : key_(key), default_(std::move(default_value)) {}
 
     Value& state(const InputRow& input) {
-      return state_.try_emplace(input[key_field_].AsString(), default_)
+      return state_.try_emplace(input[key_.field].AsString(), default_)
           .first->second;
     }
 
     template <class Fn>
     void Render(OutputBuffer* out, Fn fn) const {
       for (const auto& [key, value] : state_) {
-        out->raw()->append(key);
-        out->raw()->push_back('\t');
+        out->Column(key_.column)->assign(key);
         fn(value);
-        out->raw()->push_back('\n');
-        out->MaybeFlush();
+        out->EndLine();
       }
     }
 
    private:
     absl::flat_hash_map<std::string, Value> state_;
-    int key_field_;
+    Key key_;
     Value default_;
   };
 };

@@ -4,6 +4,7 @@ cc_library(
     srcs = ['aggregators.cc'],
     deps = [
         ':base',
+        ':output',
         ':types',
         '@com_google_absl//absl/strings',
     ],

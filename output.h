@@ -2,20 +2,23 @@
 #define GITHUB_ZISZIS_ZG_OUTPUT_INCLUDED
 
 #include <string>
+#include <vector>
 
 class OutputBuffer {
  public:
-  std::string* raw() { return &buf_; }
-
-  void MaybeFlush() {
-    if (buf_.size() > 1 << 15) Flush();
+  std::string* Column(int i) {
+    if (i >= columns_.size()) columns_.resize(i + 1);
+    return &columns_[i];
   }
+
+  void EndLine();
 
   ~OutputBuffer() { Flush(); }
 
  private:
   void Flush();
 
+  std::vector<std::string> columns_;
   std::string buf_;
 };
 

@@ -12,19 +12,19 @@ namespace {
 template <class Fn>
 class Parser {
  public:
-  Parser(const std::vector<std::string>& spec, std::vector<int>* key_fields,
-         const Fn& fn)
+  Parser(const std::vector<std::string>& spec,
+         std::vector<AggregationState::Key>* keys, const Fn& fn)
       : token_(spec.begin()),
         tokens_end_(spec.end()),
-        key_fields_(key_fields),
+        keys_(keys),
         fn_(fn) {}
 
   void Spec() {
     while (token_ != tokens_end_ || char_ != nullptr) {
       if (TryConsume('k', "key")) {
-        key_fields_->push_back(ConsumeInt() - 1);
+        keys_->emplace_back(ConsumeInt() - 1, next_output_column_++);
       } else if (TryConsume('c', "count")) {
-        fn_(CountAggregator());
+        fn_(CountAggregator(next_output_column_++));
       } else if (TryConsume('s', "sum")) {
         WithTypeAndField<SumAggregator>();
       } else if (TryConsume('m', "min")) {
@@ -75,11 +75,11 @@ class Parser {
   template <template <class V> class A>
   void WithTypeAndField() {
     if (TryConsume('i', "int")) {
-      fn_(A<NativeNum<int64_t>>(ConsumeInt() - 1));
+      fn_(A<NativeNum<int64_t>>(ConsumeInt() - 1, next_output_column_++));
     } else if (TryConsume('d', "double")) {
-      fn_(A<NativeNum<double>>(ConsumeInt() - 1));
+      fn_(A<NativeNum<double>>(ConsumeInt() - 1, next_output_column_++));
     } else {
-      fn_(A<Numeric>(ConsumeInt() - 1));
+      fn_(A<Numeric>(ConsumeInt() - 1, next_output_column_++));
     }
   }
 
@@ -88,37 +88,38 @@ class Parser {
   const char* char_ = nullptr;
   const char* chars_end_ = nullptr;
 
-  std::vector<int>* key_fields_;
+  int next_output_column_ = 0;
+  std::vector<AggregationState::Key>* keys_;
   const Fn& fn_;
 };
 
 template <class Fn>
 void ParseSpec(const std::vector<std::string>& spec,
-               std::vector<int>* key_fields, const Fn& fn) {
-  std::vector<int> dummy;
-  Parser<Fn>(spec, key_fields ? key_fields : &dummy, fn).Spec();
+               std::vector<AggregationState::Key>* keys, const Fn& fn) {
+  std::vector<AggregationState::Key> dummy;
+  Parser<Fn>(spec, keys ? keys : &dummy, fn).Spec();
 }
 
 }  // namespace
 
 std::unique_ptr<Table> ParseSpec(const std::vector<std::string>& spec) {
-  std::vector<int> key_fields;
+  std::vector<AggregationState::Key> keys;
   int num_agg = 0;
-  ParseSpec(spec, &key_fields, [&](auto) { ++num_agg; });
+  ParseSpec(spec, &keys, [&](auto) { ++num_agg; });
 
   std::unique_ptr<Table> result;
   if (num_agg == 0) {
     Fail("Not implemented");
   } else if (num_agg == 1) {
     ParseSpec(spec, nullptr, [&](auto agg) {
-      result = MakeSingleAggregatorTable(key_fields, std::move(agg));
+      result = MakeSingleAggregatorTable(keys, std::move(agg));
     });
   } else {
     std::vector<std::unique_ptr<AggregatorInterface>> aggs;
     ParseSpec(spec, nullptr, [&](auto agg) {
       aggs.push_back(TypeErasedAggregator(std::move(agg)));
     });
-    result = MakeMultiAggregatorTable(key_fields, std::move(aggs));
+    result = MakeMultiAggregatorTable(keys, std::move(aggs));
   }
   return result;
 }

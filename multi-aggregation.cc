@@ -25,14 +25,8 @@ class MultiAggregatorTable : public Table {
   void Render() override {
     OutputBuffer buffer;
     state_.Render(&buffer, [this, &buffer](auto state) {
-      bool first = true;
       for (const auto& f : fields_) {
-        if (!first) {
-          buffer.raw()->push_back('\t');
-        } else {
-          first = false;
-        }
-        f.aggregator->Print(&state[f.state_offset], buffer.raw());
+        f.aggregator->Print(&state[f.state_offset], &buffer);
       }
     });
   }
@@ -109,13 +103,14 @@ std::unique_ptr<Table> MakeMultiAggregatorTableWithStateFactory(
 }  // namespace
 
 std::unique_ptr<Table> MakeMultiAggregatorTable(
-    const std::vector<int>& key_fields, std::vector<AggregatorPtr> fields) {
-  if (key_fields.size() == 0) {
+    const std::vector<AggregationState::Key>& keys,
+    std::vector<AggregatorPtr> fields) {
+  if (keys.size() == 0) {
     return MakeMultiAggregatorTableWithStateFactory(
         AggregationState::NoKeyFactory(), std::move(fields));
-  } else if (key_fields.size() == 1) {
+  } else if (keys.size() == 1) {
     return MakeMultiAggregatorTableWithStateFactory(
-        AggregationState::OneKeyFactory{key_fields[0]}, std::move(fields));
+        AggregationState::OneKeyFactory{keys[0]}, std::move(fields));
   } else {
     Fail("Multiple grouping keys not supported yet");
     return nullptr;

@@ -5,16 +5,21 @@
 #include <variant>
 
 #include "absl/strings/str_cat.h"
+#include "output.h"
 #include "types.h"
 
 class CountAggregator {
  public:
+  explicit CountAggregator(int column) : column_(column) {}
   using State = int64_t;
   State GetDefault() const { return 0; }
   void Push(const InputRow&, State* state) const { ++*state; }
-  void Print(State state, std::string* out) const {
-    absl::StrAppend(out, state);
+  void Print(State state, OutputBuffer* out) const {
+    absl::StrAppend(out->Column(column_), state);
   }
+
+ private:
+  int column_;
 };
 
 class Numeric {
@@ -57,39 +62,42 @@ template <class Value>
 class SumAggregator {
  public:
   using State = Value;
-  explicit SumAggregator(int field) : field_(field) {}
+  SumAggregator(int field, int column) : field_(field), column_(column) {}
   State GetDefault() const { return State(); }
   void Push(const InputRow& row, State* s) const { s->Add(row[field_]); }
-  void Print(State s, std::string* out) const { s.Print(out); }
+  void Print(State s, OutputBuffer* out) const { s.Print(out->Column(column_)); }
 
  private:
   int field_;
+  int column_;
 };
 
 template <class Value>
 class MinAggregator {
  public:
   using State = Value;
-  explicit MinAggregator(int field) : field_(field) {}
+  MinAggregator(int field, int column) : field_(field), column_(column) {}
   State GetDefault() const { return Value::MaxValue(); }
   void Push(const InputRow& row, State* s) const { s->Min(row[field_]); }
-  void Print(State s, std::string* out) const { s.Print(out); }
+  void Print(State s, OutputBuffer* out) const { s.Print(out->Column(column_)); }
 
  private:
   int field_;
+  int column_;
 };
 
 template <class Value>
 class MaxAggregator {
  public:
   using State = Value;
-  explicit MaxAggregator(int field) : field_(field) {}
+  MaxAggregator(int field, int column) : field_(field), column_(column) {}
   State GetDefault() const { return Value::MinValue(); }
   void Push(const InputRow& row, State* s) const { s->Max(row[field_]); }
-  void Print(State s, std::string* out) const { s.Print(out); }
+  void Print(State s, OutputBuffer* out) const { s.Print(out->Column(column_)); }
 
  private:
   int field_;
+  int column_;
 };
 
 #endif  // GITHUB_ZISZIS_ZG_AGGREGATORS_INCLUDED
