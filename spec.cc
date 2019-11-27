@@ -10,126 +10,84 @@
 namespace {
 
 template <class Fn>
-class ShorthandParser {
- public:
-  ShorthandParser(std::string_view token, std::vector<int>* key_fields,
-                  const Fn& fn)
-      : it_(token.data()),
-        end_(token.end()),
-        key_fields_(key_fields),
-        fn_(fn) {}
-
-  void Spec() {
-    while (it_ != end_) {
-      if (TryConsume('k')) {
-        key_fields_->push_back(ConsumeInt() - 1);
-      } else if (TryConsume('c')) {
-        fn_(CountAggregator());
-      } else if (TryConsume('s')) {
-        WithTypeAndField<SumAggregator>();
-      } else if (TryConsume('m')) {
-        WithTypeAndField<MinAggregator>();
-      } else if (TryConsume('M')) {
-        WithTypeAndField<MaxAggregator>();
-      } else {
-        Fail("Unrecognized operation");
-      }
-    }
-  }
-
- private:
-  bool TryConsume(char ch) {
-    if (*it_ != ch) return false;
-    ++it_;
-    return true;
-  }
-
-  int ConsumeInt() {
-    int result;
-    auto [ptr, ec] = std::from_chars(it_, end_, result);
-    if (ec == std::errc()) {
-      it_ = ptr;
-      return result;
-    } else {
-      Fail("Expected integer");
-      return 0;
-    }
-  }
-
-  template <template <class V> class A>
-  void WithTypeAndField() {
-    if (TryConsume('i')) {
-      fn_(A<NativeNum<int64_t>>(ConsumeInt() - 1));
-    } else if (TryConsume('d')) {
-      fn_(A<NativeNum<double>>(ConsumeInt() - 1));
-    } else {
-      fn_(A<Numeric>(ConsumeInt() - 1));
-    }
-  }
-
-  const char* it_;
-  const char* end_;
-  std::vector<int>* key_fields_;
-  const Fn& fn_;
-};
-
-template <class Fn>
 class Parser {
  public:
   Parser(const std::vector<std::string>& spec, std::vector<int>* key_fields,
          const Fn& fn)
-      : it_(spec.begin()), end_(spec.end()), key_fields_(key_fields), fn_(fn) {}
+      : token_(spec.begin()),
+        tokens_end_(spec.end()),
+        key_fields_(key_fields),
+        fn_(fn) {}
 
   void Spec() {
-    while (it_ != end_) {
-      if (TryConsume("key")) {
+    while (token_ != tokens_end_ || char_ != nullptr) {
+      if (TryConsume('k', "key")) {
         key_fields_->push_back(ConsumeInt() - 1);
-      } else if (TryConsume("count")) {
+      } else if (TryConsume('c', "count")) {
         fn_(CountAggregator());
-      } else if (TryConsume("sum")) {
+      } else if (TryConsume('s', "sum")) {
         WithTypeAndField<SumAggregator>();
-      } else if (TryConsume("min")) {
+      } else if (TryConsume('m', "min")) {
         WithTypeAndField<MinAggregator>();
-      } else if (TryConsume("max")) {
+      } else if (TryConsume('M', "max")) {
         WithTypeAndField<MaxAggregator>();
+      } else if (char_ == nullptr) {
+        char_ = token_->data();
+        chars_end_ = char_ + token_->size();
+        ++token_;
       } else {
-        ShorthandParser<Fn>(*it_++, key_fields_, fn_).Spec();
+        Fail("Unparseable spec");
       }
     }
   }
 
  private:
-  bool TryConsume(const char* token) {
-    if (*it_ != token) return false;
-    ++it_;
-    return true;
+  bool TryConsume(char ch, const char* token) {
+    if (char_) {
+      if (*char_ != ch) return false;
+      if (++char_ == chars_end_) char_ = nullptr;
+      return true;
+    } else {
+      if (*token_ != token) return false;
+      ++token_;
+      return true;
+    }
   }
 
   int ConsumeInt() {
-    if (it_ == end_) {
-      Fail("Expected integer");
+    int result = 0;
+    if (char_) {
+      auto [ptr, ec] = std::from_chars(char_, chars_end_, result);
+      if (ec == std::errc()) {
+        char_ = ptr;
+        if (char_ == chars_end_) char_ = nullptr;
+      } else {
+        Fail("Expected integer");
+      }
+    } else {
+      if (token_ == tokens_end_) Fail("Expected integer");
+      if (!absl::SimpleAtoi(*token_, &result)) Fail("Failed to parse integer");
+      ++token_;
     }
-    int result;
-    if (!absl::SimpleAtoi(*it_, &result)) {
-      Fail("Failed to parse integer");
-    }
-    ++it_;
     return result;
   }
 
   template <template <class V> class A>
   void WithTypeAndField() {
-    if (TryConsume("int")) {
+    if (TryConsume('i', "int")) {
       fn_(A<NativeNum<int64_t>>(ConsumeInt() - 1));
-    } else if (TryConsume("double")) {
+    } else if (TryConsume('d', "double")) {
       fn_(A<NativeNum<double>>(ConsumeInt() - 1));
     } else {
       fn_(A<Numeric>(ConsumeInt() - 1));
     }
   }
 
-  std::vector<std::string>::const_iterator it_;
-  std::vector<std::string>::const_iterator end_;
+  std::vector<std::string>::const_iterator token_;
+  std::vector<std::string>::const_iterator tokens_end_;
+  const char* char_ = nullptr;
+  const char* chars_end_ = nullptr;
+
   std::vector<int>* key_fields_;
   const Fn& fn_;
 };
