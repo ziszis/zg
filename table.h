@@ -35,6 +35,7 @@ class AggregationState {
     template <class Fn>
     void Render(OutputBuffer* out, Fn fn) const {
       fn(value_);
+      out->raw()->push_back('\n');
     }
 
    private:
