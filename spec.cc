@@ -5,6 +5,7 @@
 #include "aggregators.h"
 #include "base.h"
 #include "multi-aggregation.h"
+#include "no-aggregation.h"
 #include "single-aggregation.h"
 
 namespace {
@@ -109,7 +110,7 @@ std::unique_ptr<Table> ParseSpec(const std::vector<std::string>& spec) {
 
   std::unique_ptr<Table> result;
   if (num_agg == 0) {
-    Fail("Not implemented");
+    result = MakeNoAggregatorsTable(keys);
   } else if (num_agg == 1) {
     ParseSpec(spec, nullptr, [&](auto agg) {
       result = MakeSingleAggregatorTable(keys, std::move(agg));
