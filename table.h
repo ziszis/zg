@@ -57,8 +57,7 @@ class AggregationState {
         : key_(key), default_(std::move(default_value)) {}
 
     Value& state(const InputRow& input) {
-      return state_.try_emplace(input[key_.field].AsString(), default_)
-          .first->second;
+      return state_.try_emplace(input[key_.field], default_).first->second;
     }
 
     template <class Fn>

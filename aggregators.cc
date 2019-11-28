@@ -13,7 +13,7 @@ inline bool SumOverflows(V a, V b) {
 void Numeric::Add(const FieldValue& field) {
   if (std::holds_alternative<std::monostate>(v_)) v_ = int64_t{0};
   if (std::holds_alternative<int64_t>(v_)) {
-    if (std::optional<int64_t> that = field.TryAsInt64()) {
+    if (std::optional<int64_t> that = TryParseAs<int64_t>(field)) {
       int64_t& current = std::get<int64_t>(v_);
       if (!SumOverflows(current, *that)) {
         current += *that;
@@ -22,45 +22,45 @@ void Numeric::Add(const FieldValue& field) {
     }
     v_ = static_cast<double>(std::get<int64_t>(v_));
   }
-  std::get<double>(v_) += field.AsDouble();
+  std::get<double>(v_) += ParseAs<double>(field);
 }
 
 void Numeric::Min(const FieldValue& field) {
   if (std::holds_alternative<std::monostate>(v_)) {
-    if (std::optional<int64_t> that = field.TryAsInt64()) {
+    if (std::optional<int64_t> that = TryParseAs<int64_t>(field)) {
       v_ = *that;
     } else {
-      v_ = field.AsDouble();
+      v_ = ParseAs<double>(field);
     }
     return;
   }
   if (std::holds_alternative<int64_t>(v_)) {
-    if (std::optional<int64_t> that = field.TryAsInt64()) {
+    if (std::optional<int64_t> that = TryParseAs<int64_t>(field)) {
       std::get<int64_t>(v_) = std::min(std::get<int64_t>(v_), *that);
       return;
     }
     v_ = static_cast<double>(std::get<int64_t>(v_));
   }
-  std::get<double>(v_) = std::min(std::get<double>(v_), field.AsDouble());
+  std::get<double>(v_) = std::min(std::get<double>(v_), ParseAs<double>(field));
 }
 
 void Numeric::Max(const FieldValue& field) {
   if (std::holds_alternative<std::monostate>(v_)) {
-    if (std::optional<int64_t> that = field.TryAsInt64()) {
+    if (std::optional<int64_t> that = TryParseAs<int64_t>(field)) {
       v_ = *that;
     } else {
-      v_ = field.AsDouble();
+      v_ = ParseAs<double>(field);
     }
     return;
   }
   if (std::holds_alternative<int64_t>(v_)) {
-    if (std::optional<int64_t> that = field.TryAsInt64()) {
+    if (std::optional<int64_t> that = TryParseAs<int64_t>(field)) {
       std::get<int64_t>(v_) = std::max(std::get<int64_t>(v_), *that);
       return;
     }
     v_ = static_cast<double>(std::get<int64_t>(v_));
   }
-  std::get<double>(v_) = std::max(std::get<double>(v_), field.AsDouble());
+  std::get<double>(v_) = std::max(std::get<double>(v_), ParseAs<double>(field));
 }
 
 void Numeric::Print(std::string* out) const {

@@ -10,27 +10,22 @@
 class FieldValue {
  public:
   explicit FieldValue(std::string_view value) : value_(value) {}
-  std::string_view AsString() const { return value_; }
-  int64_t AsInt64() const;
-  std::optional<int64_t> TryAsInt64() const;
-  double AsDouble() const;
+  operator std::string_view() const { return value_; }
 
  private:
   std::string_view value_;
 };
 
-template <class T>
-T Cast(const FieldValue& field);
-
-template <>
-inline int64_t Cast<int64_t>(const FieldValue& field) {
-  return field.AsInt64();
+template <class T, class... Ts>
+constexpr bool is_one_of() {
+  return (... || std::is_same<T, Ts>::value);
 }
 
-template <>
-inline double Cast<double>(const FieldValue& field) {
-  return field.AsDouble();
-}
+template <class T, std::enable_if_t<is_one_of<T, int64_t, double>(), int> = 0>
+T ParseAs(const FieldValue&);
+
+template <class T, std::enable_if_t<is_one_of<T, int64_t>(), int> = 0>
+std::optional<T> TryParseAs(const FieldValue&);
 
 using InputRow = std::vector<FieldValue>;
 

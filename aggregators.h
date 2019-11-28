@@ -40,9 +40,9 @@ template <class V>
 class NativeNum {
  public:
   NativeNum() : v_(0) {}
-  void Add(const FieldValue& field) { v_ += Cast<V>(field); }
-  void Min(const FieldValue& field) { v_ = std::min(v_, Cast<V>(field)); }
-  void Max(const FieldValue& field) { v_ = std::max(v_, Cast<V>(field)); }
+  void Add(const FieldValue& field) { v_ += ParseAs<V>(field); }
+  void Min(const FieldValue& field) { v_ = std::min(v_, ParseAs<V>(field)); }
+  void Max(const FieldValue& field) { v_ = std::max(v_, ParseAs<V>(field)); }
   void Print(std::string* out) const { absl::StrAppend(out, v_); }
 
   static NativeNum<V> MinValue() {
