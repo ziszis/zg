@@ -5,5 +5,5 @@
 
 void Fail(std::string_view reason) {
   std::cerr << reason << std::endl;
-  std::abort();
+  std::quick_exit(1);
 }
