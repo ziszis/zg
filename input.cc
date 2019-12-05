@@ -1,6 +1,7 @@
 #include "input.h"
 
 #include <cstdio>
+#include <cstring>
 #include <string>
 
 void ForEachInputLine(const std::function<void(const char*, const char*)>& fn) {

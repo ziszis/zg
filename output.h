@@ -7,7 +7,7 @@
 class OutputBuffer {
  public:
   std::string* Column(int i) {
-    if (i >= columns_.size()) columns_.resize(i + 1);
+    if (i >= static_cast<int>(columns_.size())) columns_.resize(i + 1);
     return &columns_[i];
   }
 
