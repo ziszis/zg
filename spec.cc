@@ -49,7 +49,7 @@ class Parser {
       if (++char_ == chars_end_) char_ = nullptr;
       return true;
     } else {
-      if (*token_ != token) return false;
+      if (token_ == tokens_end_ || *token_ != token) return false;
       ++token_;
       return true;
     }
