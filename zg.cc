@@ -10,10 +10,10 @@ int main(int argc, char* argv[]) {
   std::vector<std::string> spec;
   for (int i = 1; i < argc; ++i) spec.push_back(argv[i]);
 
-  InputRow row;
+  InputRow row("");
   std::unique_ptr<Table> table = ParseSpec(spec);
   ForEachInputLine([&](const char* begin, const char* end) {
-    SplitLine(begin, end, &row);
+    row.Reset(std::string_view(begin, end - begin));
     table->PushRow(row);
   });
   table->Render();

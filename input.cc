@@ -37,28 +37,3 @@ void ForEachInputLine(const std::function<void(const char*, const char*)>& fn) {
     }
   }
 }
-
-void SplitLine(const char* line, const char* end, InputRow* row) {
-  row->clear();
-  const char* begin = line;
-  while (true) {
-    while (true) {
-      if (begin == end) return;
-      if (*begin != ' ' && *begin != '\t') break;
-      ++begin;
-    }
-    const char* p = begin;
-    while (true) {
-      if (p == end) {
-        row->emplace_back(std::string_view(begin, p - begin));
-        return;
-      }
-      if (*p == ' ' || *p == '\t') {
-        row->emplace_back(std::string_view(begin, p - begin));
-        begin = p + 1;
-        break;
-      }
-      ++p;
-    }
-  }
-}

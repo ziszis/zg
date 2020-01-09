@@ -27,6 +27,25 @@ T ParseAs(const FieldValue&);
 template <class T, std::enable_if_t<is_one_of<T, int64_t>(), int> = 0>
 std::optional<T> TryParseAs(const FieldValue&);
 
-using InputRow = std::vector<FieldValue>;
+class InputRow {
+ public:
+  explicit InputRow(std::string_view line) : line_(line) {}
+  inline void Reset(std::string_view line) {
+    line_ = line;
+    fields_.clear();
+  }
+
+  FieldValue operator[](int i) const {
+    if (i < 0) return FieldValue(line_);
+    if (fields_.empty()) SplitLine();
+    return fields_[i];
+  }
+
+ private:
+  void SplitLine() const;
+
+  std::string_view line_;
+  mutable std::vector<FieldValue> fields_;
+};
 
 #endif  // GITHUB_ZISZIS_ZG_TYPES_INCLUDED
