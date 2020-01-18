@@ -31,15 +31,10 @@ std::unique_ptr<Table> MakeNoAggregatorsTable(
     const std::vector<AggregationState::Key>& keys) {
   if (keys.size() == 0) {
     Fail("Nothing to do");
-    return nullptr;
   } else if (keys.size() == 1) {
-    if (keys[0].column != 0) {
-      Fail("Should never happen (tm)");
-      return nullptr;
-    }
+    if (keys[0].column != 0) Fail("Should never happen (tm)");
     return std::make_unique<NoAggregatorsOneKeyTable>(keys[0].field);
   } else {
     Fail("Composite keys not supported yet");
-    return nullptr;
   }
 }

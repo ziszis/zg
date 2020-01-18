@@ -63,11 +63,14 @@ class Parser {
         char_ = ptr;
         if (char_ == chars_end_) char_ = nullptr;
       } else {
-        Fail("Expected integer");
+        Fail("Expected integer, got ",
+             Quoted(std::string_view(char_, chars_end_ - char_)));
       }
     } else {
       if (token_ == tokens_end_) Fail("Expected integer");
-      if (!absl::SimpleAtoi(*token_, &result)) Fail("Failed to parse integer");
+      if (!absl::SimpleAtoi(*token_, &result)) {
+        Fail("Failed to parse integer: ", Quoted(*token_));
+      }
       ++token_;
     }
     return result;

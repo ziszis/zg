@@ -7,7 +7,6 @@
 #include "types.h"
 
 int main(int argc, char* argv[]) {
-  if (argc < 2) Fail("Need spec");
   std::vector<std::string> spec;
   for (int i = 1; i < argc; ++i) spec.push_back(argv[i]);
 

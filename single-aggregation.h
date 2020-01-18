@@ -54,8 +54,7 @@ std::unique_ptr<Table> MakeSingleAggregatorTable(
     return MakeSingleAggregatorTable(std::move(a),
                                      AggregationState::OneKeyFactory{keys[0]});
   } else {
-    Fail("Multiple grouping keys not supported yet");
-    return nullptr;
+    Fail("Composite keys not supported yet");
   }
 }
 

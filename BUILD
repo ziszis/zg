@@ -15,6 +15,7 @@ cc_library(
     hdrs = ['base.h'],
     srcs = ['base.cc'],
     deps = [
+        '@com_google_absl//absl/strings',
     ],
 )
 

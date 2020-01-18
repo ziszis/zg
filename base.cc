@@ -1,9 +1,5 @@
 #include "base.h"
 
-#include <cstdlib>
-#include <iostream>
+#include "absl/strings/str_cat.h"
 
-void Fail(std::string_view reason) {
-  std::cerr << reason << std::endl;
-  std::exit(1);
-}
+std::string Quoted(std::string_view s) { return absl::StrCat("'", s, "'"); }

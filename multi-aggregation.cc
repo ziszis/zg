@@ -96,7 +96,6 @@ std::unique_ptr<Table> MakeMultiAggregatorTableWithStateFactory(
         std::move(state_factory), std::move(fields));
   } else {
     Fail("Too much state");  // Add more branches.
-    return nullptr;
   }
 }
 
@@ -113,6 +112,5 @@ std::unique_ptr<Table> MakeMultiAggregatorTable(
         AggregationState::OneKeyFactory{keys[0]}, std::move(fields));
   } else {
     Fail("Multiple grouping keys not supported yet");
-    return nullptr;
   }
 }

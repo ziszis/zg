@@ -6,14 +6,18 @@
 template <>
 int64_t ParseAs<>(const FieldValue& field) {
   int64_t result;
-  if (!absl::SimpleAtoi(field, &result)) Fail("Failed to parse int64_t");
+  if (!absl::SimpleAtoi(field, &result)) {
+    Fail("Failed to parse int64_t: ", Quoted(field));
+  }
   return result;
 }
 
 template <>
 double ParseAs<>(const FieldValue& field) {
   double result;
-  if (!absl::SimpleAtod(field, &result)) Fail("Failed to parse double");
+  if (!absl::SimpleAtod(field, &result)) {
+    Fail("Failed to parse double: ", Quoted(field));
+  }
   return result;
 }
 
