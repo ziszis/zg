@@ -101,6 +101,33 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = 'varint',
+    hdrs = ['varint.h'],
+    srcs = ['varint.cc'],
+    deps = [
+        ':base',
+    ],
+)
+
+cc_binary(
+    name = 'varint_bench',
+    srcs = ['varint_bench.cc'],
+    deps = [
+        ':varint',
+        '@com_github_google_benchmark//:benchmark_main',
+    ],
+)
+
+cc_test(
+    name = 'varint_test',
+    srcs = ['varint_test.cc'],
+    deps = [
+        ':varint',
+        '@com_google_test//:gtest_main',
+    ],
+)
+
 cc_binary(
     name = 'zg',
     srcs = ['zg.cc'],

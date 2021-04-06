@@ -1,1 +1,1 @@
-build --cxxopt=--std=c++17 --cxxopt=-O3
+build --cxxopt=--std=c++2a --cxxopt=-O3
