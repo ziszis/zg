@@ -16,6 +16,7 @@ int main(int argc, char* argv[]) {
     row.Reset(std::string_view(begin, end - begin));
     table->PushRow(row);
   });
-  table->Render();
+  OutputBuffer out;
+  table->Render(&out);
   return 0;
 }

@@ -20,6 +20,17 @@ cc_library(
 )
 
 cc_library(
+    name = 'composite-key',
+    hdrs = ['composite-key.h'],
+    deps = [
+        ':table',
+        ':varint',
+        '@com_google_absl//absl/container:flat_hash_map',
+        '@com_google_absl//absl/container:flat_hash_set',
+    ],
+)
+
+cc_library(
     name = 'input',
     hdrs = ['input.h'],
     srcs = ['input.cc'],
@@ -35,18 +46,17 @@ cc_library(
     deps = [
         ':base',
         ':table',
+        ':no-keys',
+        ':single-key',
+        ':composite-key',
     ],
 )
 
 cc_library(
-    name = 'no-aggregation',
-    hdrs = ['no-aggregation.h'],
-    srcs = ['no-aggregation.cc'],
+    name = 'no-keys',
+    hdrs = ['no-keys.h'],
     deps = [
-        ':base',
         ':table',
-        ':varint',
-        '@com_google_absl//absl/container:flat_hash_set',
     ],
 )
 
@@ -60,11 +70,12 @@ cc_library(
 )
 
 cc_library(
-    name = 'single-aggregation',
-    hdrs = ['single-aggregation.h'],
+    name = 'single-key',
+    hdrs = ['single-key.h'],
     deps = [
-        ':base',
         ':table',
+        '@com_google_absl//absl/container:flat_hash_map',
+        '@com_google_absl//absl/container:flat_hash_set',
     ],
 )
 
@@ -76,8 +87,9 @@ cc_library(
         ':aggregators',
         ':base',
         ':multi-aggregation',
-        ':no-aggregation',
-        ':single-aggregation',
+        ':no-keys',
+        ':single-key',
+        ':composite-key',
         ':table',
     ],
 )
@@ -88,8 +100,6 @@ cc_library(
     deps = [
         ':output',
         ':types',
-        ':varint',
-        '@com_google_absl//absl/container:flat_hash_map',
     ],
 )
 

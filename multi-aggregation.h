@@ -23,7 +23,7 @@ template <class A>
 std::unique_ptr<AggregatorInterface> TypeErasedAggregator(A a);
 
 std::unique_ptr<Table> MakeMultiAggregatorTable(
-    const std::vector<AggregationState::Key>& keys,
+    std::vector<Table::Key> keys,
     std::vector<std::unique_ptr<AggregatorInterface>> aggregated_fields);
 
 //===========================================================================

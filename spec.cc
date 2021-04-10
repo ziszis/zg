@@ -4,21 +4,19 @@
 
 #include "aggregators.h"
 #include "base.h"
+#include "composite-key.h"
 #include "multi-aggregation.h"
-#include "no-aggregation.h"
-#include "single-aggregation.h"
+#include "no-keys.h"
+#include "single-key.h"
 
 namespace {
 
 template <class Fn>
 class Parser {
  public:
-  Parser(const std::vector<std::string>& spec,
-         std::vector<AggregationState::Key>* keys, const Fn& fn)
-      : token_(spec.begin()),
-        tokens_end_(spec.end()),
-        keys_(keys),
-        fn_(fn) {}
+  Parser(const std::vector<std::string>& spec, std::vector<Table::Key>* keys,
+         const Fn& fn)
+      : token_(spec.begin()), tokens_end_(spec.end()), keys_(keys), fn_(fn) {}
 
   void Spec() {
     while (token_ != tokens_end_ || char_ != nullptr) {
@@ -93,37 +91,51 @@ class Parser {
   const char* chars_end_ = nullptr;
 
   int next_output_column_ = 0;
-  std::vector<AggregationState::Key>* keys_;
+  std::vector<Table::Key>* keys_;
   const Fn& fn_;
 };
 
 template <class Fn>
 void ParseSpec(const std::vector<std::string>& spec,
-               std::vector<AggregationState::Key>* keys, const Fn& fn) {
-  std::vector<AggregationState::Key> dummy;
+               std::vector<Table::Key>* keys, const Fn& fn) {
+  std::vector<Table::Key> dummy;
   Parser<Fn>(spec, keys ? keys : &dummy, fn).Spec();
 }
 
 }  // namespace
 
 std::unique_ptr<Table> ParseSpec(const std::vector<std::string>& spec) {
-  std::vector<AggregationState::Key> keys;
+  std::vector<Table::Key> keys;
   int num_agg = 0;
   ParseSpec(spec, &keys, [&](auto) { ++num_agg; });
 
-  std::unique_ptr<Table> result;
   if (num_agg == 0) {
-    result = MakeNoAggregatorsTable(keys);
+    if (keys.size() == 0) {
+      Fail("Nothing to do");
+    } else if (keys.size() == 1) {
+      return std::make_unique<SingleKeyNoAggregationTable>(keys[0]);
+    } else {
+      return std::make_unique<CompositeKeyNoAggregationTable>(std::move(keys));
+    }
   } else if (num_agg == 1) {
+    std::unique_ptr<Table> result;
     ParseSpec(spec, nullptr, [&](auto agg) {
-      result = MakeSingleAggregatorTable(keys, std::move(agg));
+      if (keys.size() == 0) {
+        result = std::make_unique<NoKeyTable<decltype(agg)>>(std::move(agg));
+      } else if (keys.size() == 1) {
+        result = std::make_unique<SingleKeyTable<decltype(agg)>>(
+            keys[0], std::move(agg));
+      } else {
+        result = std::make_unique<CompositeKeyTable<decltype(agg)>>(
+            std::move(keys), std::move(agg));
+      }
     });
+    return result;
   } else {
     std::vector<std::unique_ptr<AggregatorInterface>> aggs;
     ParseSpec(spec, nullptr, [&](auto agg) {
       aggs.push_back(TypeErasedAggregator(std::move(agg)));
     });
-    result = MakeMultiAggregatorTable(keys, std::move(aggs));
+    return MakeMultiAggregatorTable(std::move(keys), std::move(aggs));
   }
-  return result;
 }
