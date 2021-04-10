@@ -7,13 +7,6 @@
 #include "varint.h"
 
 class AggregationState {
-  template <class Value>
-  class NoKey;
-  template <class Value>
-  class OneKey;
-  template <class Value>
-  class MultiKey;
-
  public:
   struct Key {
     Key(int field_, int column_) : field(field_), column(column_) {}
@@ -21,54 +14,43 @@ class AggregationState {
     int column;
   };
 
-  struct NoKeyFactory {
-    template <class Value>
-    NoKey<Value> operator()(Value dflt) const {
-      return NoKey<Value>(std::move(dflt));
-    }
-  };
-
-  struct OneKeyFactory {
-    Key key;
-    template <class Value>
-    OneKey<Value> operator()(Value dflt) const {
-      return OneKey<Value>(key, std::move(dflt));
-    }
-  };
-
-  struct MultiKeyFactory {
-    std::vector<Key> key;
-    template <class Value>
-    MultiKey<Value> operator()(Value dflt) const {
-      return MultiKey<Value>(key, std::move(dflt));
-    }
-  };
-
- private:
   template <class Value>
-  class NoKey {
+  class NoKeys {
    public:
-    explicit NoKey(Value value) : value_(std::move(value)) {}
-    Value& state(const InputRow&) { return value_; }
+    template <class InsertFn, class UpdateFn>
+    void Push(const InputRow& row, InsertFn insert, UpdateFn update) {
+      if (value_) {
+        update(*value_);
+      } else {
+        value_ = insert();
+      }
+    }
 
     template <class Fn>
     void Render(OutputBuffer* out, Fn fn) const {
-      fn(value_);
-      out->EndLine();
+      if (value_) {
+        fn(*value_);
+        out->EndLine();
+      }
     }
 
    private:
-    Value value_;
+    absl::optional<Value> value_;
   };
 
   template <class Value>
-  class OneKey {
+  class SingleKey {
    public:
-    OneKey(Key key, Value default_value)
-        : key_(key), default_(std::move(default_value)) {}
+    explicit SingleKey(const Key& key) : key_(key) {}
 
-    Value& state(const InputRow& input) {
-      return state_.try_emplace(input[key_.field], default_).first->second;
+    template <class InsertFn, class UpdateFn>
+    void Push(const InputRow& row, InsertFn insert, UpdateFn update) {
+      auto it = state_.find(row[key_.field]);
+      if (it == state_.end()) {
+        state_.emplace_hint(it, row[key_.field], insert());
+      } else {
+        update(it->second);
+      }
     }
 
     template <class Fn>
@@ -83,26 +65,31 @@ class AggregationState {
    private:
     absl::flat_hash_map<std::string, Value> state_;
     Key key_;
-    Value default_;
   };
 
   template <class Value>
-  class MultiKey {
+  class CompositeKey {
    public:
-    MultiKey(std::vector<Key> key, Value default_value)
-        : key_(std::move(key)), default_(std::move(default_value)) {}
+    explicit CompositeKey(std::vector<Key> key) : key_(key) {}
 
-    Value& state(const InputRow& input) {
+    template <class InsertFn, class UpdateFn>
+    void Push(const InputRow& row, InsertFn insert, UpdateFn update) {
       buf_.clear();
-      for (const Key& key : key_) {
-        std::string_view value = input[key.field];
+      for (const auto& key : key_) {
+        std::string_view value = row[key.field];
         if (value.size() > std::numeric_limits<uint32_t>::max()) {
           Fail("Key too long, length=", value.size());
         }
         AppendVarint32(value.size(), &buf_);
         buf_.append(value);
       }
-      return state_.try_emplace(buf_, default_).first->second;
+
+      auto it = state_.find(buf_);
+      if (it == state_.end()) {
+        state_.emplace_hint(it, buf_, insert());
+      } else {
+        update(it->second);
+      }
     }
 
     template <class Fn>
@@ -123,7 +110,6 @@ class AggregationState {
     absl::flat_hash_map<std::string, Value> state_;
     std::vector<Key> key_;
     std::string buf_;
-    Value default_;
   };
 };
 

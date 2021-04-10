@@ -11,8 +11,15 @@ inline bool SumOverflows(V a, V b) {
 
 }  // namespace
 
-void Numeric::Add(const FieldValue& field) {
-  if (std::holds_alternative<std::monostate>(v_)) v_ = int64_t{0};
+Numeric Numeric::Make(FieldValue field) {
+  if (std::optional<int64_t> that = TryParseAs<int64_t>(field)) {
+    return Numeric(*that);
+  } else {
+    return Numeric(ParseAs<double>(field));
+  }
+}
+
+void Numeric::Add(FieldValue field) {
   if (std::holds_alternative<int64_t>(v_)) {
     if (std::optional<int64_t> that = TryParseAs<int64_t>(field)) {
       int64_t& current = std::get<int64_t>(v_);
@@ -26,15 +33,7 @@ void Numeric::Add(const FieldValue& field) {
   std::get<double>(v_) += ParseAs<double>(field);
 }
 
-void Numeric::Min(const FieldValue& field) {
-  if (std::holds_alternative<std::monostate>(v_)) {
-    if (std::optional<int64_t> that = TryParseAs<int64_t>(field)) {
-      v_ = *that;
-    } else {
-      v_ = ParseAs<double>(field);
-    }
-    return;
-  }
+void Numeric::Min(FieldValue field) {
   if (std::holds_alternative<int64_t>(v_)) {
     if (std::optional<int64_t> that = TryParseAs<int64_t>(field)) {
       std::get<int64_t>(v_) = std::min(std::get<int64_t>(v_), *that);
@@ -45,15 +44,7 @@ void Numeric::Min(const FieldValue& field) {
   std::get<double>(v_) = std::min(std::get<double>(v_), ParseAs<double>(field));
 }
 
-void Numeric::Max(const FieldValue& field) {
-  if (std::holds_alternative<std::monostate>(v_)) {
-    if (std::optional<int64_t> that = TryParseAs<int64_t>(field)) {
-      v_ = *that;
-    } else {
-      v_ = ParseAs<double>(field);
-    }
-    return;
-  }
+void Numeric::Max(FieldValue field) {
   if (std::holds_alternative<int64_t>(v_)) {
     if (std::optional<int64_t> that = TryParseAs<int64_t>(field)) {
       std::get<int64_t>(v_) = std::max(std::get<int64_t>(v_), *that);
@@ -66,7 +57,6 @@ void Numeric::Max(const FieldValue& field) {
 
 void Numeric::Print(std::string* out) const {
   struct {
-    void operator()(std::monostate) { Fail("Uninitialized value?"); }
     void operator()(int64_t v) { absl::StrAppend(out, v); }
     void operator()(double v) { absl::StrAppendFormat(out, "%.8g", v); }
     std::string* out;

@@ -22,7 +22,9 @@ class SingleAggregatorTable : public Table {
       : state_(std::move(state)), agg_(std::move(agg)) {}
 
   void PushRow(const InputRow& row) override {
-    agg_.Push(row, &state_.state(row));
+    state_.Push(
+        row, [&] { return agg_.Init(row); },
+        [&](typename Aggregator::State& value) { agg_.Update(row, value); });
   }
 
   void Render() override {
@@ -37,25 +39,24 @@ class SingleAggregatorTable : public Table {
   Aggregator agg_;
 };
 
-template <class A, class StateFactory>
-auto MakeSingleAggregatorTable(A a, StateFactory sf) {
-  auto state = sf(a.GetDefault());
-  return std::make_unique<SingleAggregatorTable<A, decltype(state)>>(
-      std::move(a), std::move(state));
+template <class A, class State>
+auto MakeSingleAggregatorTable(A a, State s) {
+  return std::make_unique<SingleAggregatorTable<A, State>>(std::move(a),
+                                                           std::move(s));
 }
 
 template <class A>
 std::unique_ptr<Table> MakeSingleAggregatorTable(
     const std::vector<AggregationState::Key>& keys, A a) {
   if (keys.size() == 0) {
-    return MakeSingleAggregatorTable(std::move(a),
-                                     AggregationState::NoKeyFactory());
+    return MakeSingleAggregatorTable(
+        std::move(a), AggregationState::NoKeys<typename A::State>());
   } else if (keys.size() == 1) {
-    return MakeSingleAggregatorTable(std::move(a),
-                                     AggregationState::OneKeyFactory{keys[0]});
+    return MakeSingleAggregatorTable(
+        std::move(a), AggregationState::SingleKey<typename A::State>(keys[0]));
   } else {
-    return MakeSingleAggregatorTable(std::move(a),
-                                     AggregationState::MultiKeyFactory{keys});
+    return MakeSingleAggregatorTable(
+        std::move(a), AggregationState::CompositeKey<typename A::State>(keys));
   }
 }
 

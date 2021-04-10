@@ -14,9 +14,9 @@ class AggregatorInterface {
  public:
   virtual ~AggregatorInterface() {}
   virtual size_t StateSize() const = 0;
-  virtual void GetDefault(char* storage) const = 0;
-  virtual void Push(const InputRow& row, char* state) = 0;
-  virtual void Print(const char* state, OutputBuffer*) = 0;
+  virtual void Init(const InputRow& row, char* state) const = 0;
+  virtual void Update(const InputRow& row, char* state) const = 0;
+  virtual void Print(const char* state, OutputBuffer*) const = 0;
 };
 
 template <class A>
@@ -42,13 +42,13 @@ class AggregatorWrapper : public AggregatorInterface {
     static_assert(size % alignof(State) == 0);
     return size;
   }
-  void GetDefault(char* storage) const override {
-    *reinterpret_cast<State*>(storage) = a_.GetDefault();
+  void Init(const InputRow& row, char* state) const override {
+    *reinterpret_cast<State*>(state) = a_.Init(row);
   }
-  void Push(const InputRow& row, char* state) override {
-    a_.Push(row, reinterpret_cast<State*>(state));
+  void Update(const InputRow& row, char* state) const override {
+    a_.Update(row, *reinterpret_cast<State*>(state));
   }
-  void Print(const char* state, OutputBuffer* out) override {
+  void Print(const char* state, OutputBuffer* out) const override {
     a_.Print(*reinterpret_cast<const State*>(state), out);
   }
 
@@ -58,6 +58,7 @@ class AggregatorWrapper : public AggregatorInterface {
 
 template <class A>
 std::unique_ptr<AggregatorInterface> TypeErasedAggregator(A a) {
+  static_assert(std::is_trivially_destructible<typename A::State>::value);
   return std::make_unique<AggregatorWrapper<A>>(std::move(a));
 }
 

@@ -12,8 +12,8 @@ class CountAggregator {
  public:
   explicit CountAggregator(int column) : column_(column) {}
   using State = int64_t;
-  State GetDefault() const { return 0; }
-  void Push(const InputRow&, State* state) const { ++*state; }
+  State Init(const InputRow&) const { return 1; }
+  void Update(const InputRow&, State& state) const { ++state; }
   void Print(State state, OutputBuffer* out) const {
     absl::StrAppend(out->Column(column_), state);
   }
@@ -24,38 +24,34 @@ class CountAggregator {
 
 class Numeric {
  public:
-  void Add(const FieldValue&);
-  void Min(const FieldValue&);
-  void Max(const FieldValue&);
+  static Numeric Make(FieldValue);
+
+  void Add(FieldValue);
+  void Min(FieldValue);
+  void Max(FieldValue);
   void Print(std::string*) const;
 
-  static Numeric MinValue() { return {}; }
-  static Numeric MaxValue() { return {}; }
-
  private:
-  std::variant<std::monostate, int64_t, double> v_;
+  explicit Numeric(int64_t v) : v_(v) {}
+  explicit Numeric(double v) : v_(v) {}
+  std::variant<int64_t, double> v_;
 };
 
 template <class V>
 class NativeNum {
  public:
-  NativeNum() : v_(0) {}
+  static NativeNum Make(const FieldValue& field) {
+    return NativeNum(ParseAs<V>(field));
+  }
+
   void Add(const FieldValue& field) { v_ += ParseAs<V>(field); }
   void Min(const FieldValue& field) { v_ = std::min(v_, ParseAs<V>(field)); }
   void Max(const FieldValue& field) { v_ = std::max(v_, ParseAs<V>(field)); }
   void Print(std::string* out) const { absl::StrAppend(out, v_); }
 
-  static NativeNum<V> MinValue() {
-    return NativeNum(std::numeric_limits<V>::lowest());
-  }
-  static NativeNum<V> MaxValue() {
-    return NativeNum(std::numeric_limits<V>::max());
-  }
-
  private:
-  V v_;
-
   explicit NativeNum(V v) : v_(v) {}
+  V v_;
 };
 
 template <class Value>
@@ -63,9 +59,14 @@ class SumAggregator {
  public:
   using State = Value;
   SumAggregator(int field, int column) : field_(field), column_(column) {}
-  State GetDefault() const { return State(); }
-  void Push(const InputRow& row, State* s) const { s->Add(row[field_]); }
-  void Print(State s, OutputBuffer* out) const { s.Print(out->Column(column_)); }
+
+  State Init(const InputRow& row) const { return State::Make(row[field_]); }
+  void Update(const InputRow& row, State& state) const {
+    state.Add(row[field_]);
+  }
+  void Print(State s, OutputBuffer* out) const {
+    s.Print(out->Column(column_));
+  }
 
  private:
   int field_;
@@ -77,9 +78,13 @@ class MinAggregator {
  public:
   using State = Value;
   MinAggregator(int field, int column) : field_(field), column_(column) {}
-  State GetDefault() const { return Value::MaxValue(); }
-  void Push(const InputRow& row, State* s) const { s->Min(row[field_]); }
-  void Print(State s, OutputBuffer* out) const { s.Print(out->Column(column_)); }
+  State Init(const InputRow& row) const { return State::Make(row[field_]); }
+  void Update(const InputRow& row, State& state) const {
+    state.Min(row[field_]);
+  }
+  void Print(State s, OutputBuffer* out) const {
+    s.Print(out->Column(column_));
+  }
 
  private:
   int field_;
@@ -91,9 +96,13 @@ class MaxAggregator {
  public:
   using State = Value;
   MaxAggregator(int field, int column) : field_(field), column_(column) {}
-  State GetDefault() const { return Value::MinValue(); }
-  void Push(const InputRow& row, State* s) const { s->Max(row[field_]); }
-  void Print(State s, OutputBuffer* out) const { s.Print(out->Column(column_)); }
+  State Init(const InputRow& row) const { return State::Make(row[field_]); }
+  void Update(const InputRow& row, State& state) const {
+    state.Max(row[field_]);
+  }
+  void Print(State s, OutputBuffer* out) const {
+    s.Print(out->Column(column_));
+  }
 
  private:
   int field_;
