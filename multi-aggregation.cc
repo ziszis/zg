@@ -111,6 +111,7 @@ std::unique_ptr<Table> MakeMultiAggregatorTable(
     return MakeMultiAggregatorTableWithStateFactory(
         AggregationState::OneKeyFactory{keys[0]}, std::move(fields));
   } else {
-    Fail("Multiple grouping keys not supported yet");
+    return MakeMultiAggregatorTableWithStateFactory(
+        AggregationState::MultiKeyFactory{keys}, std::move(fields));
   }
 }

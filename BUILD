@@ -45,6 +45,7 @@ cc_library(
     deps = [
         ':base',
         ':table',
+        ':varint',
         '@com_google_absl//absl/container:flat_hash_set',
     ],
 )
@@ -87,6 +88,7 @@ cc_library(
     deps = [
         ':output',
         ':types',
+        ':varint',
         '@com_google_absl//absl/container:flat_hash_map',
     ],
 )
