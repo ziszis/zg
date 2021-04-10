@@ -1,6 +1,7 @@
 #include "varint.h"
 
 #include <bit>
+#include <cstring>
 #include <limits>
 
 #include "base.h"
@@ -11,7 +12,7 @@ namespace {
 template <int k>
 inline char* Store(uint32_t x, char* out) {
   static_assert(std::endian::native == std::endian::little);
-  memcpy(out, &x, k);
+  std::memcpy(out, &x, k);
   return out + k;
 }
 
@@ -19,7 +20,7 @@ template <int k>
 inline uint32_t Load(const char*& p) {
   uint32_t x = 0;
   static_assert(std::endian::native == std::endian::little);
-  memcpy(&x, p, k);
+  std::memcpy(&x, p, k);
   p += k;
   return x;
 }
