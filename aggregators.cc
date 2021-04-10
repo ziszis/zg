@@ -1,4 +1,5 @@
 #include "aggregators.h"
+#include "absl/strings/str_format.h"
 
 namespace {
 
@@ -67,7 +68,7 @@ void Numeric::Print(std::string* out) const {
   struct {
     void operator()(std::monostate) { Fail("Uninitialized value?"); }
     void operator()(int64_t v) { absl::StrAppend(out, v); }
-    void operator()(double v) { absl::StrAppend(out, v); }
+    void operator()(double v) { absl::StrAppendFormat(out, "%.8g", v); }
     std::string* out;
   } p{out};
   std::visit(p, v_);

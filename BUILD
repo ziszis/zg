@@ -6,7 +6,7 @@ cc_library(
         ':base',
         ':output',
         ':types',
-        '@com_google_absl//absl/strings',
+        '@com_google_absl//absl/strings:str_format',
     ],
 )
 
