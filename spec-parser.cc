@@ -1,6 +1,9 @@
 #include "spec-parser.h"
 
+#include <regex>
+
 #include "absl/strings/str_cat.h"
+#include "base.h"
 
 namespace spec {
 
@@ -94,6 +97,39 @@ Pipeline Parse(const std::vector<std::string>& spec) { return {}; }
 template <>
 std::string ToString(const Pipeline& pipeline) {
   return ToString(pipeline, {.delim=" => "});
+}
+
+std::vector<std::pair<int, std::string_view>> SplitIntoTokens(
+    const std::string& s, const std::vector<std::string_view>& token_regexes) {
+  std::string composed_regex;
+  for (const auto& r : token_regexes) {
+    if (!composed_regex.empty()) composed_regex.push_back('|');
+    composed_regex.append("^(");
+    composed_regex.append(r);
+    composed_regex.push_back(')');
+  }
+  std::regex regex(composed_regex);
+
+  std::vector<std::pair<int, std::string_view>> result;
+  std::cmatch matches;
+  const char* begin = s.data();
+  const char* end = begin + s.size();
+  while (begin != end) {
+    if (!std::regex_search<const char*>(begin, end, matches, regex)) {
+      Fail(absl::StrCat("Unrecognized token\n", s, "\n",
+                        std::string(begin - s.data(), ' '), "^"));
+    }
+    for (int i = 0; i < token_regexes.size(); ++i) {
+      const auto& match = matches[i + 1];
+      if (match.matched) {
+        result.push_back(
+            {i, std::string_view(match.first, match.second - match.first)});
+        begin = match.second;
+        break;
+      }
+    }
+  }
+  return result;
 }
 
 }  // namespace spec

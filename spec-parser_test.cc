@@ -30,5 +30,35 @@ TEST(SpecParser, ToString) {
   EXPECT_EQ(ToString(num_tickers), "count(distinct, _1)");
 }
 
+TEST(SpecParser, Tmp) {
+  enum TokenType { END, PIPE, ID, OPAREN, CPAREN, COMMA, TILDE };
+  std::vector<std::string_view> regexes = {
+      "[ \t]+", "=>", "[_a-zA-Z][_a-zA-Z0-9]+", "\\(", "\\)", ",", "~",
+  };
+
+  using Expected = std::vector<std::pair<int, std::string_view>>;
+  Expected expected = {
+    {2, "filter"},
+    {3, "("},
+    {2, "_2"},
+    {6, "~"},
+    {2, "AAPL"},
+    {4, ")"},
+    {0, " "},
+    {1, "=>"},
+    {0, " "},
+    {2, "count"},
+    {3, "("},
+    {2, "distinct"},
+    {5, ","},
+    {0, " "},
+    {2, "_1"},
+    {4, ")"},
+    {0, " "},
+  };
+  EXPECT_EQ(SplitIntoTokens("filter(_2~AAPL) => count(distinct, _1) ", regexes),
+            expected);
+}
+
 }  // namespace
 }  // spec

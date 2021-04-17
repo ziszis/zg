@@ -63,6 +63,9 @@ Pipeline Parse(const std::vector<std::string>& spec);
 template <class T>
 std::string ToString(const T& spec_element);
 
+std::vector<std::pair<int, std::string_view>> SplitIntoTokens(
+    const std::string& s, const std::vector<std::string_view>& token_regexes);
+
 }  // namespace spec
 
 #endif  // GITHUB_ZISZIS_ZG_SPEC_PARSER_INCLUDED

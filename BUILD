@@ -99,6 +99,7 @@ cc_library(
     hdrs = ['spec-parser.h'],
     srcs = ['spec-parser.cc'],
     deps = [
+        ':base',
         '@com_google_absl//absl/strings',
     ],
 )
