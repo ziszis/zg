@@ -5,10 +5,31 @@
 namespace spec {
 namespace {
 
+TEST(SpecParser, Empty) {
+  EXPECT_EQ(ToString(Parse("")), "_0");
+}
+
 TEST(SpecParser, Smoke) {
-  Pipeline pipeline = Parse({});
-  std::string result = ToString(pipeline);
-  EXPECT_EQ(result, "");
+  EXPECT_EQ(ToString(Parse({"count key(_1) => count"})),
+            "count key(_1) => count");
+}
+
+TEST(SpecParser, MoreSpaces) {
+  EXPECT_EQ(ToString(Parse({"count( distinct,_1)  "})), "count(distinct, _1)");
+}
+
+TEST(SpecParser, ShortForms1) {
+  EXPECT_EQ(ToString(Parse({"c"})), "count");
+}
+
+TEST(SpecParser, ShortForms2) {
+  EXPECT_EQ(ToString(Parse({"c k1=>c"})), "count key(_1) => count");
+}
+
+TEST(SpecParser, ShortForms3) {
+  EXPECT_EQ(ToString(Parse({"f~AAPL c"})), "filter(_0~AAPL) count");
+  EXPECT_EQ(ToString(Parse({" f1~ AAPL"})), "filter(_1~AAPL) _0");
+  EXPECT_EQ(ToString(Parse({"f2 ~AAPL "})), "filter(_2~AAPL) _0");
 }
 
 TEST(SpecParser, ToString) {

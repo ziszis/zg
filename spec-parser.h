@@ -58,7 +58,7 @@ struct SimpleTable {
 using Stage = std::variant<SimpleTable, AggregatedTable>;
 using Pipeline = std::vector<Stage>;
 
-Pipeline Parse(const std::vector<std::string>& spec);
+Pipeline Parse(const std::string& spec);
 
 template <class T>
 std::string ToString(const T& spec_element);
