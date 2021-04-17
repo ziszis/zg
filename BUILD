@@ -95,6 +95,23 @@ cc_library(
 )
 
 cc_library(
+    name = 'spec-parser',
+    hdrs = ['spec-parser.h'],
+    srcs = ['spec-parser.cc'],
+    deps = [
+    ],
+)
+
+cc_test(
+    name = 'spec-parser_test',
+    srcs = ['spec-parser_test.cc'],
+    deps = [
+        ':spec-parser',
+        '@com_google_test//:gtest_main',
+    ],
+)
+
+cc_library(
     name = 'table',
     hdrs = ['table.h'],
     deps = [
