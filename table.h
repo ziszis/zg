@@ -13,7 +13,7 @@ class Table {
 
   virtual ~Table() {}
   virtual void PushRow(const InputRow& row) = 0;
-  virtual void Finalize() const = 0;
+  virtual void Finish() = 0;
 };
 
 #endif  // GITHUB_ZISZIS_ZG_TABLE_INCLUDED

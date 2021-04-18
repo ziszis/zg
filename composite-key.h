@@ -27,11 +27,11 @@ class BaseCompositeKeyTable : public Table {
     }
   }
 
-  void RenderKey(const std::string& serialized_key, OutputBuffer* out) const {
+  void RenderKey(const std::string& serialized_key, OutputTable& out) const {
     const char* p = serialized_key.data();
     for (const Table::Key& key : key_) {
       uint32_t len = ParseVarint32(p);
-      out->Column(key.column)->assign(p, len);
+      out.Set(key.column, std::string_view(p, len));
       p += len;
     }
   }
@@ -43,9 +43,11 @@ class BaseCompositeKeyTable : public Table {
 template <class Aggregator>
 class CompositeKeyTable : public BaseCompositeKeyTable {
  public:
-  CompositeKeyTable(std::vector<Table::Key> key, Aggregator aggregator)
+  CompositeKeyTable(std::vector<Table::Key> key, Aggregator aggregator,
+                    std::unique_ptr<OutputTable> output)
       : BaseCompositeKeyTable(std::move(key)),
-        aggregator_(std::move(aggregator)) {}
+        aggregator_(std::move(aggregator)),
+        output_(std::move(output)) {}
 
   void PushRow(const InputRow& row) override {
     SerializeKey(row);
@@ -57,38 +59,45 @@ class CompositeKeyTable : public BaseCompositeKeyTable {
     }
   }
 
-  void Render(OutputBuffer* out) const override {
+  void Finish() override {
     for (const auto& [serialized_key, value] : state_) {
-      RenderKey(serialized_key, out);
-      aggregator_.Print(value, out);
-      out->EndLine();
+      RenderKey(serialized_key, *output_);
+      aggregator_.Print(value, *output_);
+      output_->EndLine();
     }
+    decltype(state_)().swap(state_);
+    output_->Finish();
   }
 
  private:
   absl::flat_hash_map<std::string, typename Aggregator::State> state_;
   Aggregator aggregator_;
+  std::unique_ptr<OutputTable> output_;
 };
 
 class CompositeKeyNoAggregationTable : public BaseCompositeKeyTable {
  public:
-  explicit CompositeKeyNoAggregationTable(std::vector<Table::Key> key)
-      : BaseCompositeKeyTable(std::move(key)) {}
+  CompositeKeyNoAggregationTable(std::vector<Table::Key> key,
+                                 std::unique_ptr<OutputTable> output)
+      : BaseCompositeKeyTable(std::move(key)), output_(std::move(output)) {}
 
   void PushRow(const InputRow& row) override {
     SerializeKey(row);
     state_.insert(buf_);
   }
 
-  void Render(OutputBuffer* out) const override {
+  void Finish() override {
     for (const auto& serialized_key : state_) {
-      RenderKey(serialized_key, out);
-      out->EndLine();
+      RenderKey(serialized_key, *output_);
+      output_->EndLine();
     }
+    decltype(state_)().swap(state_);
+    output_->Finish();
   }
 
  private:
   absl::flat_hash_set<std::string> state_;
+  std::unique_ptr<OutputTable> output_;
 };
 
 #endif  // GITHUB_ZISZIS_ZG_COMPOSITE_KEY_INCLUDED

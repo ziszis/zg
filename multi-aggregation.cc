@@ -45,7 +45,7 @@ class MultiAggregator {
     }
   }
 
-  void Print(const State& state, OutputBuffer* out) const {
+  void Print(const State& state, OutputTable& out) const {
     for (const auto& f : fields_) {
       f.aggregator->Print(&state[f.state_offset], out);
     }
@@ -76,16 +76,18 @@ std::pair<size_t, std::vector<AggregatorField>> LayoutAggregatorState(
 }
 
 template <class Aggregator>
-std::unique_ptr<Table> MakeMultiAggregatorTable(Aggregator aggregator,
-                                                std::vector<Table::Key> keys) {
+std::unique_ptr<Table> MakeMultiAggregatorTable(
+    Aggregator aggregator, std::vector<Table::Key> keys,
+    std::unique_ptr<OutputTable> output) {
   if (keys.size() == 0) {
-    return std::make_unique<NoKeyTable<Aggregator>>(std::move(aggregator));
+    return std::make_unique<NoKeyTable<Aggregator>>(std::move(aggregator),
+                                                    std::move(output));
   } else if (keys.size() == 1) {
-    return std::make_unique<SingleKeyTable<Aggregator>>(keys[0],
-                                                        std::move(aggregator));
+    return std::make_unique<SingleKeyTable<Aggregator>>(
+        keys[0], std::move(aggregator), std::move(output));
   } else {
     return std::make_unique<CompositeKeyTable<Aggregator>>(
-        std::move(keys), std::move(aggregator));
+        std::move(keys), std::move(aggregator), std::move(output));
   }
 }
 
@@ -93,27 +95,28 @@ std::unique_ptr<Table> MakeMultiAggregatorTable(Aggregator aggregator,
 
 std::unique_ptr<Table> MakeMultiAggregatorTable(
     std::vector<Table::Key> keys,
-    std::vector<std::unique_ptr<AggregatorInterface>> aggregators) {
+    std::vector<std::unique_ptr<AggregatorInterface>> aggregators,
+    std::unique_ptr<OutputTable> output) {
   auto [total_size, fields] = LayoutAggregatorState(std::move(aggregators));
 
   if (total_size <= 8) {
     return MakeMultiAggregatorTable(MultiAggregator<8>(std::move(fields)),
-                                    std::move(keys));
+                                    std::move(keys), std::move(output));
   } else if (total_size <= 16) {
     return MakeMultiAggregatorTable(MultiAggregator<16>(std::move(fields)),
-                                    std::move(keys));
+                                    std::move(keys), std::move(output));
   } else if (total_size <= 24) {
     return MakeMultiAggregatorTable(MultiAggregator<24>(std::move(fields)),
-                                    std::move(keys));
+                                    std::move(keys), std::move(output));
   } else if (total_size <= 32) {
     return MakeMultiAggregatorTable(MultiAggregator<32>(std::move(fields)),
-                                    std::move(keys));
+                                    std::move(keys), std::move(output));
   } else if (total_size <= 48) {
     return MakeMultiAggregatorTable(MultiAggregator<48>(std::move(fields)),
-                                    std::move(keys));
+                                    std::move(keys), std::move(output));
   } else if (total_size <= 64) {
     return MakeMultiAggregatorTable(MultiAggregator<64>(std::move(fields)),
-                                    std::move(keys));
+                                    std::move(keys), std::move(output));
   } else {
     Fail("Too much state");  // Add more branches.
   }

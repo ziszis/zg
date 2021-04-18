@@ -45,10 +45,11 @@ cc_library(
     srcs = ['multi-aggregation.cc'],
     deps = [
         ':base',
-        ':table',
-        ':no-keys',
-        ':single-key',
         ':composite-key',
+        ':no-keys',
+        ':output',
+        ':single-key',
+        ':table',
     ],
 )
 

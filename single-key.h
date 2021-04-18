@@ -8,8 +8,11 @@
 template <class Aggregator>
 class SingleKeyTable : public Table {
  public:
-  SingleKeyTable(Table::Key key, Aggregator aggregator)
-      : key_(std::move(key)), aggregator_(std::move(aggregator)) {}
+  SingleKeyTable(Table::Key key, Aggregator aggregator,
+                 std::unique_ptr<OutputTable> output)
+      : key_(std::move(key)),
+        aggregator_(std::move(aggregator)),
+        output_(std::move(output)) {}
 
   void PushRow(const InputRow& row) override {
     auto it = state_.find(row[key_.field]);
@@ -20,38 +23,46 @@ class SingleKeyTable : public Table {
     }
   }
 
-  void Render(OutputBuffer* out) const override {
+  void Finish() override {
     for (const auto& [key, value] : state_) {
-      out->Column(key_.column)->assign(key);
-      aggregator_.Print(value, out);
-      out->EndLine();
+      output_->Set(key_.column, key);
+      aggregator_.Print(value, *output_);
+      output_->EndLine();
     }
+    decltype(state_)().swap(state_);
+    output_->Finish();
   }
 
  private:
   absl::flat_hash_map<std::string, typename Aggregator::State> state_;
   Table::Key key_;
   Aggregator aggregator_;
+  std::unique_ptr<OutputTable> output_;
 };
 
 class SingleKeyNoAggregationTable : public Table {
  public:
-  explicit SingleKeyNoAggregationTable(Table::Key key) : key_(std::move(key)) {}
+  SingleKeyNoAggregationTable(Table::Key key,
+                              std::unique_ptr<OutputTable> output)
+      : key_(std::move(key)), output_(std::move(output)) {}
 
   void PushRow(const InputRow& row) override {
     state_.emplace(row[key_.field]);
   }
 
-  void Render(OutputBuffer* out) const override {
+  void Finish() override {
     for (const auto& key : state_) {
-      out->Column(key_.column)->assign(key);
-      out->EndLine();
+      output_->Set(key_.column, key);
+      output_->EndLine();
     }
+    decltype(state_)().swap(state_);
+    output_->Finish();
   }
 
  private:
   absl::flat_hash_set<std::string> state_;
   Table::Key key_;
+  std::unique_ptr<OutputTable> output_;
 };
 
 #endif  // GITHUB_ZISZIS_ZG_SINGLE_KEY_INCLUDED

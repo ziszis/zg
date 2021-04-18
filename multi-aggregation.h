@@ -16,7 +16,7 @@ class AggregatorInterface {
   virtual size_t StateSize() const = 0;
   virtual void Init(const InputRow& row, char* state) const = 0;
   virtual void Update(const InputRow& row, char* state) const = 0;
-  virtual void Print(const char* state, OutputBuffer*) const = 0;
+  virtual void Print(const char* state, OutputTable&) const = 0;
 };
 
 template <class A>
@@ -24,7 +24,8 @@ std::unique_ptr<AggregatorInterface> TypeErasedAggregator(A a);
 
 std::unique_ptr<Table> MakeMultiAggregatorTable(
     std::vector<Table::Key> keys,
-    std::vector<std::unique_ptr<AggregatorInterface>> aggregated_fields);
+    std::vector<std::unique_ptr<AggregatorInterface>> aggregated_fields,
+    std::unique_ptr<OutputTable> output);
 
 //===========================================================================
 // Implementation below
@@ -48,7 +49,7 @@ class AggregatorWrapper : public AggregatorInterface {
   void Update(const InputRow& row, char* state) const override {
     a_.Update(row, *reinterpret_cast<State*>(state));
   }
-  void Print(const char* state, OutputBuffer* out) const override {
+  void Print(const char* state, OutputTable& out) const override {
     a_.Print(*reinterpret_cast<const State*>(state), out);
   }
 

@@ -8,8 +8,8 @@
 template <class Aggregator>
 class NoKeyTable : public Table {
  public:
-  explicit NoKeyTable(Aggregator aggregator)
-      : aggregator_(std::move(aggregator)) {}
+  NoKeyTable(Aggregator aggregator, std::unique_ptr<OutputTable> output)
+      : aggregator_(std::move(aggregator)), output_(std::move(output)) {}
 
   void PushRow(const InputRow& row) override {
     if (value_) {
@@ -19,10 +19,12 @@ class NoKeyTable : public Table {
     }
   }
 
-  void Render(OutputBuffer* out) const override {
+  void Finish() override {
     if (value_) {
-      aggregator_.Print(*value_, out);
-      out->EndLine();
+      aggregator_.Print(*value_, *output_);
+      output_->EndLine();
+      value_.reset();
+      output_->Finish();
     } else {
       Fail("No data to aggregate");
     }
@@ -31,6 +33,7 @@ class NoKeyTable : public Table {
  private:
   std::optional<typename Aggregator::State> value_;
   Aggregator aggregator_;
+  std::unique_ptr<OutputTable> output_;
 };
 
 #endif  // GITHUB_ZISZIS_ZG_NO_KEY_INCLUDED
