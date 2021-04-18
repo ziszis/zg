@@ -72,6 +72,23 @@ cc_library(
 )
 
 cc_library(
+    name = 'pipeline',
+    hdrs = ['pipeline.h'],
+    srcs = ['pipeline.cc'],
+    deps = [
+        ':aggregators',
+        ':base',
+        ':composite-key',
+        ':multi-aggregation',
+        ':no-keys',
+        ':output',
+        ':single-key',
+        ':spec',
+        ':table',
+    ],
+)
+
+cc_library(
     name = 'single-key',
     hdrs = ['single-key.h'],
     deps = [
@@ -170,7 +187,9 @@ cc_binary(
     deps = [
         ':base',
         ':input',
+        ':pipeline',
         ':spec',
+        ':spec-parser',
         ':types',
     ],
 )
