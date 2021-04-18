@@ -2,6 +2,7 @@
 #define GITHUB_ZISZIS_ZG_SPEC_PARSER_INCLUDED
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <variant>
 #include <vector>
@@ -63,8 +64,30 @@ Pipeline Parse(const std::string& spec);
 template <class T>
 std::string ToString(const T& spec_element);
 
-std::vector<std::pair<int, std::string_view>> SplitIntoTokens(
-    const std::string& s, const std::vector<std::string_view>& token_regexes);
+// Implementation detail of `Parse()`. Only exposed for testing.
+class Tokenizer {
+ public:
+  enum TokenType { END=0, PIPE, ID, OPAREN, CPAREN, COMMA, TILDE };
+  struct Token {
+    TokenType type;
+    std::string_view value;
+  };
+
+  explicit Tokenizer(std::string spec);
+
+  Token Peek() { return tokens_[current_]; }
+  Token ConsumeId(std::string_view expected_value);
+  Token ConsumeAnyId(std::string_view expected_desc);
+  Token Consume(TokenType type);
+  std::optional<Token> TryConsume(TokenType type);
+
+  [[noreturn]] void FailParse(std::string_view error, int tokens_back = 0);
+
+ private:
+  std::string spec_;
+  std::vector<Token> tokens_;
+  int current_;
+};
 
 }  // namespace spec
 
