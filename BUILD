@@ -37,6 +37,7 @@ cc_library(
     deps = [
         ':spec',
         ':table',
+        '@com_github_google_re2//:re2',
     ],
 )
 

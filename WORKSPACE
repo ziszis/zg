@@ -23,3 +23,11 @@ git_repository(
   commit = '73d4d5e8d6d449fc8663765a42aa8aeeee844489',
   shallow_since = '1599818118 +0100',
 )
+
+git_repository(
+  name = 'com_github_google_re2',
+  remote = 'https://github.com/google/re2.git',
+  # aka tag = '2021-04-01',
+  commit = '13ebb377c6ad763ca61d12dd6f88b1126bd0b911',
+  shallow_since = '1616761406 +0000',
+)
