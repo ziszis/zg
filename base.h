@@ -11,6 +11,10 @@ template <class... T>
   std::exit(1);
 }
 
+[[noreturn]] void Unimplemented(std::string_view feature);
+
+[[noreturn]] void LogicError(std::string_view reason = {});
+
 std::string Quoted(std::string_view s);
 
 #endif  // GITHUB_ZISZIS_ZG_BASE_INCLUDED
