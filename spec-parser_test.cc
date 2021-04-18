@@ -42,11 +42,11 @@ TEST(SpecParserTest, CountDistinct) {
 }
 
 TEST(SpecParserTest, Filter) {
-  EXPECT_EQ(ToString(Parse("filter(_1~AAPL)")), "filter(_1~AAPL) _0");
-  EXPECT_EQ(ToString(Parse("f~AAPL")), "filter(_0~AAPL) _0");
-  EXPECT_EQ(ToString(Parse(" f1~ AAPL")), "filter(_1~AAPL) _0");
-  EXPECT_EQ(ToString(Parse("f2 ~AAPL ")), "filter(_2~AAPL) _0");
-  EXPECT_EQ(ToString(Parse("f~'AAPL'")), "filter(_0~AAPL) _0");
+  EXPECT_EQ(ToString(Parse("filter(_1~FOO)")), "filter(_1~FOO) _0");
+  EXPECT_EQ(ToString(Parse("f~FOO")), "filter(_0~FOO) _0");
+  EXPECT_EQ(ToString(Parse(" f1~ FOO")), "filter(_1~FOO) _0");
+  EXPECT_EQ(ToString(Parse("f2 ~FOO ")), "filter(_2~FOO) _0");
+  EXPECT_EQ(ToString(Parse("f~'FOO'")), "filter(_0~FOO) _0");
   EXPECT_EQ(ToString(Parse("f~'.*\\\\.US'")), "filter(_0~'.*\\\\.US') _0");
 }
 
@@ -59,11 +59,11 @@ TEST(SpecParserTest, Pipeline) {
 }
 
 TEST(SpecParserTest, ToString) {
-  // Date when AAPL reached max price:
-  Stage max_aapl = AggregatedTable{
-      .filters = {Filter{.regexp = {.what = Expr{1}, .regexp = "AAPL"}}},
+  // Date when FOO reached max price:
+  Stage max_foo = AggregatedTable{
+      .filters = {Filter{.regexp = {.what = Expr{1}, .regexp = "FOO"}}},
       .components = {{Max{.what = {3}, .output = {Expr{2}}}}}};
-  EXPECT_EQ(ToString(Pipeline{max_aapl}), "filter(_1~AAPL) max(_3, _2)");
+  EXPECT_EQ(ToString(Pipeline{max_foo}), "filter(_1~FOO) max(_3, _2)");
 
   // Number of unique tickers:
   Pipeline num_tickers = {
@@ -78,12 +78,12 @@ TEST(SpecParserTest, ToString) {
 }
 
 TEST(TokenizerTest, Smoke) {
-  Tokenizer tokenizer("filter(_2~AAPL) => count(distinct, _1) ");
+  Tokenizer tokenizer("filter(_2~FOO) => count(distinct, _1) ");
   tokenizer.ConsumeId("filter");
   tokenizer.Consume(Tokenizer::OPAREN);
   tokenizer.ConsumeId("_2");
   tokenizer.Consume(Tokenizer::TILDE);
-  tokenizer.ConsumeId("AAPL");
+  tokenizer.ConsumeId("FOO");
   tokenizer.Consume(Tokenizer::CPAREN);
   tokenizer.Consume(Tokenizer::PIPE);
   tokenizer.ConsumeId("count");
