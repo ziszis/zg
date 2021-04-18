@@ -56,3 +56,12 @@ void InputRow::SplitLine() const {
     }
   }
 }
+
+void InputRow::BuildLine() const {
+  line_buf_.clear();
+  for (std::string_view c : fields_) {
+    line_buf_.append(c);
+    line_buf_.push_back('\t');
+  }
+  line_ = std::string_view(line_buf_.data(), line_buf_.size() - 1);
+}

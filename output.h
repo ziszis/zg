@@ -1,25 +1,27 @@
 #ifndef GITHUB_ZISZIS_ZG_OUTPUT_INCLUDED
 #define GITHUB_ZISZIS_ZG_OUTPUT_INCLUDED
 
+#include <memory>
 #include <string>
 #include <vector>
 
-class OutputBuffer {
+#include "table.h"
+
+class OutputTable {
  public:
-  std::string* Column(int i) {
-    if (i >= static_cast<int>(columns_.size())) columns_.resize(i + 1);
-    return &columns_[i];
-  }
+  explicit OutputTable(int num_columns) : columns_(num_columns) {}
+  virtual ~OutputTable() {}
 
-  void EndLine();
+  void Set(int column, std::string_view value) { columns_[column] = value; }
+  virtual void EndLine() = 0;
 
-  ~OutputBuffer() { Flush(); }
-
- private:
-  void Flush();
-
-  std::vector<std::string> columns_;
-  std::string buf_;
+ protected:
+  std::vector<std::string_view> columns_;
 };
+
+std::unique_ptr<OutputTable> MakeStdoutTable(int num_columns);
+
+std::unique_ptr<OutputTable> MakePipeTable(int num_columns,
+                                           std::unique_ptr<Table> table);
 
 #endif  // GITHUB_ZISZIS_ZG_OUTPUT_INCLUDED

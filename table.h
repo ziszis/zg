@@ -1,7 +1,6 @@
 #ifndef GITHUB_ZISZIS_ZG_TABLE_INCLUDED
 #define GITHUB_ZISZIS_ZG_TABLE_INCLUDED
 
-#include "output.h"
 #include "types.h"
 
 class Table {
@@ -14,7 +13,7 @@ class Table {
 
   virtual ~Table() {}
   virtual void PushRow(const InputRow& row) = 0;
-  virtual void Render(OutputBuffer* out) const = 0;
+  virtual void Finalize() const = 0;
 };
 
 #endif  // GITHUB_ZISZIS_ZG_TABLE_INCLUDED

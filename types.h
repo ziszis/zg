@@ -29,23 +29,33 @@ std::optional<T> TryParseAs(const FieldValue&);
 
 class InputRow {
  public:
-  explicit InputRow(std::string_view line) : line_(line) {}
   inline void Reset(std::string_view line) {
     line_ = line;
     fields_.clear();
   }
 
+  void Reset(const std::vector<std::string_view>& columns) {
+    fields_.clear();
+    line_ = std::string_view();
+    for (auto c : columns) fields_.push_back(FieldValue(c));
+  }
+
   FieldValue operator[](int i) const {
-    if (i < 0) return FieldValue(line_);
+    if (i == 0) {
+      if (line_.data() == nullptr) BuildLine();
+      return FieldValue(line_);
+    }
     if (fields_.empty()) SplitLine();
-    return fields_[i];
+    return fields_[i - 1];
   }
 
  private:
   void SplitLine() const;
+  void BuildLine() const;
 
-  std::string_view line_;
+  mutable std::string_view line_;
   mutable std::vector<FieldValue> fields_;
+  mutable std::string line_buf_;
 };
 
 #endif  // GITHUB_ZISZIS_ZG_TYPES_INCLUDED

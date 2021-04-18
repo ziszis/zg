@@ -66,6 +66,7 @@ cc_library(
     srcs = ['output.cc'],
     deps = [
         ':base',
+        ':table',
     ],
 )
 
@@ -117,7 +118,6 @@ cc_library(
     name = 'table',
     hdrs = ['table.h'],
     deps = [
-        ':output',
         ':types',
     ],
 )
