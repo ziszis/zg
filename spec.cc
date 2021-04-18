@@ -1,141 +1,101 @@
 #include "spec.h"
 
-#include <charconv>
+#include <regex>
 
-#include "aggregators.h"
-#include "base.h"
-#include "composite-key.h"
-#include "multi-aggregation.h"
-#include "no-keys.h"
-#include "single-key.h"
+#include "absl/strings/str_cat.h"
 
+namespace spec {
 namespace {
 
-template <class Fn>
-class Parser {
- public:
-  Parser(const std::vector<std::string>& spec, std::vector<Table::Key>* keys,
-         const Fn& fn)
-      : token_(spec.begin()), tokens_end_(spec.end()), keys_(keys), fn_(fn) {}
-
-  void Spec() {
-    while (token_ != tokens_end_ || char_ != nullptr) {
-      if (TryConsume('k', "key")) {
-        keys_->emplace_back(ConsumeInt() - 1, next_output_column_++);
-      } else if (TryConsume('c', "count")) {
-        fn_(CountAggregator(next_output_column_++));
-      } else if (TryConsume('s', "sum")) {
-        WithTypeAndField<SumAggregator>();
-      } else if (TryConsume('m', "min")) {
-        WithTypeAndField<MinAggregator>();
-      } else if (TryConsume('M', "max")) {
-        WithTypeAndField<MaxAggregator>();
-      } else if (char_ == nullptr) {
-        char_ = token_->data();
-        chars_end_ = char_ + token_->size();
-        ++token_;
-      } else {
-        Fail("Unparseable spec");
-      }
-    }
-  }
-
- private:
-  bool TryConsume(char ch, const char* token) {
-    if (char_) {
-      if (*char_ != ch) return false;
-      if (++char_ == chars_end_) char_ = nullptr;
-      return true;
-    } else {
-      if (token_ == tokens_end_ || *token_ != token) return false;
-      ++token_;
-      return true;
-    }
-  }
-
-  int ConsumeInt() {
-    int result = 0;
-    if (char_) {
-      auto [ptr, ec] = std::from_chars(char_, chars_end_, result);
-      if (ec == std::errc()) {
-        char_ = ptr;
-        if (char_ == chars_end_) char_ = nullptr;
-      } else {
-        Fail("Expected integer, got ",
-             Quoted(std::string_view(char_, chars_end_ - char_)));
-      }
-    } else {
-      if (token_ == tokens_end_) Fail("Expected integer");
-      if (!absl::SimpleAtoi(*token_, &result)) {
-        Fail("Failed to parse integer: ", Quoted(*token_));
-      }
-      ++token_;
-    }
-    return result;
-  }
-
-  template <template <class V> class A>
-  void WithTypeAndField() {
-    if (TryConsume('i', "int")) {
-      fn_(A<NativeNum<int64_t>>(ConsumeInt() - 1, next_output_column_++));
-    } else if (TryConsume('d', "double")) {
-      fn_(A<NativeNum<double>>(ConsumeInt() - 1, next_output_column_++));
-    } else {
-      fn_(A<Numeric>(ConsumeInt() - 1, next_output_column_++));
-    }
-  }
-
-  std::vector<std::string>::const_iterator token_;
-  std::vector<std::string>::const_iterator tokens_end_;
-  const char* char_ = nullptr;
-  const char* chars_end_ = nullptr;
-
-  int next_output_column_ = 0;
-  std::vector<Table::Key>* keys_;
-  const Fn& fn_;
+struct Delimiters {
+  std::string_view leader;
+  std::string_view trailer;
+  std::string_view delim;
 };
 
-template <class Fn>
-void ParseSpec(const std::vector<std::string>& spec,
-               std::vector<Table::Key>* keys, const Fn& fn) {
-  std::vector<Table::Key> dummy;
-  Parser<Fn>(spec, keys ? keys : &dummy, fn).Spec();
+template <class T>
+std::string ToString(const std::vector<T>& elts, Delimiters d) {
+  std::string result;
+  for (int i = 0; i < elts.size(); ++i) {
+    if (d.leader.data()) result.append(d.leader);
+    if (i != 0 && d.delim.data() != nullptr) result.append(d.delim);
+    result.append(ToString(elts[i]));
+    if (d.trailer.data()) result.append(d.trailer);
+  }
+  return result;
 }
 
 }  // namespace
 
-std::unique_ptr<Table> ParseSpec(const std::vector<std::string>& spec) {
-  std::vector<Table::Key> keys;
-  int num_agg = 0;
-  ParseSpec(spec, &keys, [&](auto) { ++num_agg; });
-
-  if (num_agg == 0) {
-    if (keys.size() == 0) {
-      Fail("Nothing to do");
-    } else if (keys.size() == 1) {
-      return std::make_unique<SingleKeyNoAggregationTable>(keys[0]);
-    } else {
-      return std::make_unique<CompositeKeyNoAggregationTable>(std::move(keys));
-    }
-  } else if (num_agg == 1) {
-    std::unique_ptr<Table> result;
-    ParseSpec(spec, nullptr, [&](auto agg) {
-      if (keys.size() == 0) {
-        result = std::make_unique<NoKeyTable<decltype(agg)>>(std::move(agg));
-      } else if (keys.size() == 1) {
-        result = std::make_unique<SingleKeyTable<decltype(agg)>>(
-            keys[0], std::move(agg));
-      } else {
-        result = std::make_unique<CompositeKeyTable<decltype(agg)>>(
-            std::move(keys), std::move(agg));
-      }
-    });
-    return result;
-  } else {
-    std::vector<std::unique_ptr<AggregatorInterface>> aggs;
-    ParseSpec(spec, nullptr, [&](auto agg) {
-      aggs.push_back(TypeErasedAggregator(std::move(agg)));
-    });
-    return MakeMultiAggregatorTable(std::move(keys), std::move(aggs));
-  }
+template <class... T>
+std::string ToString(const std::variant<T...>& value) {
+  return std::visit([&](const auto& v) { return ToString(v); }, value);
 }
+
+template <>
+std::string ToString(const Expr& expr) {
+  return absl::StrCat("_", expr.field);
+}
+
+template <>
+std::string ToString(const Key& key) {
+  return absl::StrCat("key(", ToString(key.expr), ")");
+}
+
+template <>
+std::string ToString(const Sum& sum) {
+  return absl::StrCat("sum(", ToString(sum.expr), ")");
+}
+
+template <>
+std::string ToString(const Min& min) {
+  return absl::StrCat("min(", ToString(min.what),
+                      ToString(min.output, {.leader = ", "}), ")");
+}
+
+template <>
+std::string ToString(const Max& max) {
+  return absl::StrCat("max(", ToString(max.what),
+                      ToString(max.output, {.leader = ", "}), ")");
+}
+
+template <>
+std::string ToString(const Count& count) {
+  return "count";
+}
+
+template <>
+std::string ToString(const CountDistinct& cd) {
+  return absl::StrCat("count(distinct, ", ToString(cd.what), ")");
+}
+
+template <>
+std::string ToString(const Filter& filter) {
+  std::string escaped = filter.regexp.regexp;
+  if (!std::regex_match(escaped, std::regex("^[a-zA-Z][a-zA-Z0-9]*$"))) {
+    escaped = std::regex_replace(escaped, std::regex("\\\\"), "\\\\");
+    escaped = std::regex_replace(escaped, std::regex("'"), "\\'");
+    escaped = absl::StrCat("'", escaped, "'");
+  }
+  return absl::StrCat("filter(", ToString(filter.regexp.what), "~", escaped,
+                      ")");
+}
+
+template <>
+std::string ToString(const AggregatedTable& table) {
+  return absl::StrCat(ToString(table.filters, {.trailer = " "}),
+                      ToString(table.components, {.delim = " "}));
+}
+
+template <>
+std::string ToString(const SimpleTable& table) {
+  return absl::StrCat(ToString(table.filters, {.trailer = " "}),
+                      ToString(table.columns, {.delim = " "}));
+}
+
+template <>
+std::string ToString(const Pipeline& pipeline) {
+  return ToString(pipeline, {.delim=" => "});
+}
+
+}  // namespace spec

@@ -86,13 +86,16 @@ cc_library(
     hdrs = ['spec.h'],
     srcs = ['spec.cc'],
     deps = [
-        ':aggregators',
-        ':base',
-        ':multi-aggregation',
-        ':no-keys',
-        ':single-key',
-        ':composite-key',
-        ':table',
+        '@com_google_absl//absl/strings',
+    ],
+)
+
+cc_test(
+    name = 'spec_test',
+    srcs = ['spec_test.cc'],
+    deps = [
+        ':spec',
+        '@com_google_test//:gtest_main',
     ],
 )
 
@@ -102,6 +105,7 @@ cc_library(
     srcs = ['spec-parser.cc'],
     deps = [
         ':base',
+        ':spec',
         '@com_google_absl//absl/strings',
     ],
 )
