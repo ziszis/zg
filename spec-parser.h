@@ -67,7 +67,17 @@ std::string ToString(const T& spec_element);
 // Implementation detail of `Parse()`. Only exposed for testing.
 class Tokenizer {
  public:
-  enum TokenType { END=0, PIPE, ID, OPAREN, CPAREN, COMMA, TILDE };
+  enum TokenType {
+    END = 0,
+    PIPE,
+    ID,
+    OPAREN,
+    CPAREN,
+    COMMA,
+    TILDE,
+    SQUOTED_STRING,
+    DQUOTED_STRING
+  };
   struct Token {
     TokenType type;
     std::string_view value;
@@ -80,6 +90,7 @@ class Tokenizer {
   Token ConsumeAnyId(std::string_view expected_desc);
   Token Consume(TokenType type);
   std::optional<Token> TryConsume(TokenType type);
+  std::string ConsumeString(std::string_view expected_desc);
 
   [[noreturn]] void FailParse(std::string_view error, int tokens_back = 0);
 

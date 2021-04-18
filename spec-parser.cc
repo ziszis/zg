@@ -10,13 +10,15 @@ namespace spec {
 
 Tokenizer::Tokenizer(std::string spec) : spec_(std::move(spec)), current_(0) {
   std::vector<std::pair<TokenType, std::string>> regexes = {
-    {END, "[ \t]+"},  // `END` stands for whitespace in this function
-    {PIPE, "=>"},
-    {ID, "[_a-zA-Z][_a-zA-Z0-9]*"},
-    {OPAREN, "\\("},
-    {CPAREN, "\\)"},
-    {COMMA, ","},
-    {TILDE, "~"},
+      {END, "[ \t\n]+"},  // `END` stands for whitespace in this function
+      {PIPE, "=>"},
+      {ID, "[_a-zA-Z][_a-zA-Z0-9]*"},
+      {OPAREN, "\\("},
+      {CPAREN, "\\)"},
+      {COMMA, ","},
+      {TILDE, "~"},
+      {SQUOTED_STRING, R"END('(?:[^'\\]|\\\\|\\')*')END"},
+      {DQUOTED_STRING, R"END("(?:[^"\\]|\\\\|\\")*")END"},
   };
 
   std::string composed_regex;
@@ -85,6 +87,10 @@ Tokenizer::Token Tokenizer::Consume(TokenType type) {
           return "','";
         case TILDE:
           return "'~'";
+        case SQUOTED_STRING:
+          return "a single-quoted literal";
+        case DQUOTED_STRING:
+          return "a double-quoted literal";
       }
     }();
     FailParse(absl::StrCat("expected ", expected));
@@ -97,6 +103,24 @@ std::optional<Tokenizer::Token> Tokenizer::TryConsume(TokenType type) {
     return tokens_[current_++];
   } else {
     return std::nullopt;
+  }
+}
+
+std::string Tokenizer::ConsumeString(std::string_view expected_desc) {
+  if (auto token = TryConsume(ID)) {
+    return std::string(token->value);
+  } else if (auto token = TryConsume(SQUOTED_STRING)) {
+    std::string result(token->value.data() + 1, token->value.size() - 2);
+    result = std::regex_replace(result, std::regex("\\\\\\\\"), "\\");
+    result = std::regex_replace(result, std::regex("\\\\'"), "'");
+    return result;
+  } else if (auto token = TryConsume(DQUOTED_STRING)) {
+    std::string result(token->value.data() + 1, token->value.size() - 2);
+    result = std::regex_replace(result, std::regex("\\\\\\\\"), "\\");
+    result = std::regex_replace(result, std::regex("\\\\\""), "\"");
+    return result;
+  } else {
+    FailParse(absl::StrCat("expected ", expected_desc));
   }
 }
 
@@ -233,14 +257,14 @@ class Parser : public Tokenizer {
     Consume(OPAREN);
     Expr what = ParseExpr();
     Consume(TILDE);
-    std::string regexp = ParseString("regexp");
+    std::string regexp = ConsumeString("regexp");
     Consume(CPAREN);
     return Filter{.regexp{what, regexp}};
   }
 
   Filter ParseShortFilter(Expr what) {
     Consume(TILDE);
-    std::string regexp = ParseString("regexp");
+    std::string regexp = ConsumeString("regexp");
     return Filter{.regexp{what, regexp}};
   }
 
@@ -257,10 +281,6 @@ class Parser : public Tokenizer {
     } else {
       return std::nullopt;
     }
-  }
-
-  std::string ParseString(std::string_view expected) {
-    return std::string(ConsumeAnyId(expected).value);
   }
 };
 
@@ -335,8 +355,14 @@ std::string ToString(const CountDistinct& cd) {
 
 template <>
 std::string ToString(const Filter& filter) {
-  return absl::StrCat("filter(", ToString(filter.regexp.what), "~",
-                      filter.regexp.regexp, ")");
+  std::string escaped = filter.regexp.regexp;
+  if (!std::regex_match(escaped, std::regex("^[a-zA-Z][a-zA-Z0-9]*$"))) {
+    escaped = std::regex_replace(escaped, std::regex("\\\\"), "\\\\");
+    escaped = std::regex_replace(escaped, std::regex("'"), "\\'");
+    escaped = absl::StrCat("'", escaped, "'");
+  }
+  return absl::StrCat("filter(", ToString(filter.regexp.what), "~", escaped,
+                      ")");
 }
 
 template <>

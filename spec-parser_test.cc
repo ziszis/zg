@@ -46,6 +46,8 @@ TEST(SpecParserTest, Filter) {
   EXPECT_EQ(ToString(Parse("f~AAPL")), "filter(_0~AAPL) _0");
   EXPECT_EQ(ToString(Parse(" f1~ AAPL")), "filter(_1~AAPL) _0");
   EXPECT_EQ(ToString(Parse("f2 ~AAPL ")), "filter(_2~AAPL) _0");
+  EXPECT_EQ(ToString(Parse("f~'AAPL'")), "filter(_0~AAPL) _0");
+  EXPECT_EQ(ToString(Parse("f~'.*\\\\.US'")), "filter(_0~'.*\\\\.US') _0");
 }
 
 TEST(SpecParserTest, MoreSpaces) {
@@ -90,6 +92,23 @@ TEST(TokenizerTest, Smoke) {
   tokenizer.Consume(Tokenizer::COMMA);
   tokenizer.ConsumeId("_1");
   tokenizer.Consume(Tokenizer::CPAREN);
+}
+
+TEST(TokenizerTest, Strings) {
+  Tokenizer tokenizer(R"END(
+    abc d1
+    'abc' '' '\\' '"\''
+    "" "'" "\\\\'\""
+  )END");
+  EXPECT_EQ(tokenizer.ConsumeString(""), "abc");
+  EXPECT_EQ(tokenizer.ConsumeString(""), "d1");
+  EXPECT_EQ(tokenizer.ConsumeString(""), "abc");
+  EXPECT_EQ(tokenizer.ConsumeString(""), "");
+  EXPECT_EQ(tokenizer.ConsumeString(""), "\\");
+  EXPECT_EQ(tokenizer.ConsumeString(""), "\"'");
+  EXPECT_EQ(tokenizer.ConsumeString(""), "");
+  EXPECT_EQ(tokenizer.ConsumeString(""), "'");
+  EXPECT_EQ(tokenizer.ConsumeString(""), "\\\\'\"");
 }
 
 }  // namespace
