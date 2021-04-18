@@ -2,6 +2,7 @@
 
 #include "aggregators.h"
 #include "composite-key.h"
+#include "filter-table.h"
 #include "multi-aggregation.h"
 #include "no-keys.h"
 #include "output.h"
@@ -77,15 +78,15 @@ auto AggregatorFromSpec(int column, const CountDistinct&) -> CountAggregator {
   Unimplemented("count(distinct)");
 }
 
-std::unique_ptr<Table> TableFromSpec(const spec::AggregatedTable& spec,
-                                     std::unique_ptr<Table> pipe_to) {
-  if (!spec.filters.empty()) Unimplemented("filters");
-  if (spec.components.empty()) LogicError("aggregated table with no columns");
+std::unique_ptr<Table> AggregateFromSpec(
+    const std::vector<AggregatedTable::Component>& components,
+    std::unique_ptr<Table> pipe_to) {
+  if (components.empty()) LogicError("aggregated table with no columns");
 
   std::vector<Table::Key> keys;
   int num_columns = 0;
   int num_aggs = 0;
-  for (const auto& cmp : spec.components) {
+  for (const auto& cmp : components) {
     if (const spec::Key* key = std::get_if<spec::Key>(&cmp)) {
       keys.push_back(Table::Key(key->expr.field, num_columns));
     } else {
@@ -102,7 +103,7 @@ std::unique_ptr<Table> TableFromSpec(const spec::AggregatedTable& spec,
     return BuildNoAggregationTable(std::move(keys), std::move(output));
   } else if (num_aggs == 1) {
     int agg_column = 0;
-    for (const auto& cmp : spec.components) {
+    for (const auto& cmp : components) {
       if (!std::holds_alternative<spec::Key>(cmp)) {
         return std::visit(
             [&](auto&& agg_spec) {
@@ -118,7 +119,7 @@ std::unique_ptr<Table> TableFromSpec(const spec::AggregatedTable& spec,
   } else {
     std::vector<std::unique_ptr<AggregatorInterface>> aggregators;
     int agg_column = 0;
-    for (const auto& cmp : spec.components) {
+    for (const auto& cmp : components) {
       if (!std::holds_alternative<spec::Key>(cmp)) {
         std::visit(
             [&](auto&& agg_spec) {
@@ -132,6 +133,12 @@ std::unique_ptr<Table> TableFromSpec(const spec::AggregatedTable& spec,
     return MakeMultiAggregatorTable(std::move(keys), std::move(aggregators),
                                     std::move(output));
   }
+}
+
+std::unique_ptr<Table> TableFromSpec(const spec::AggregatedTable& spec,
+                                     std::unique_ptr<Table> pipe_to) {
+  return WrapFilter(spec.filters,
+                    AggregateFromSpec(spec.components, std::move(pipe_to)));
 }
 
 std::unique_ptr<Table> TableFromSpec(const spec::SimpleTable& spec,

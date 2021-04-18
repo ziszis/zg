@@ -31,6 +31,16 @@ cc_library(
 )
 
 cc_library(
+    name = 'filter-table',
+    hdrs = ['filter-table.h'],
+    srcs = ['filter-table.cc'],
+    deps = [
+        ':spec',
+        ':table',
+    ],
+)
+
+cc_library(
     name = 'input',
     hdrs = ['input.h'],
     srcs = ['input.cc'],
@@ -79,6 +89,7 @@ cc_library(
         ':aggregators',
         ':base',
         ':composite-key',
+        ':filter-table',
         ':multi-aggregation',
         ':no-keys',
         ':output',
