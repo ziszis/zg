@@ -5,34 +5,58 @@
 namespace spec {
 namespace {
 
-TEST(SpecParser, Empty) {
+TEST(SpecParserTest, Empty) {
   EXPECT_EQ(ToString(Parse("")), "_0");
 }
 
-TEST(SpecParser, Smoke) {
-  EXPECT_EQ(ToString(Parse({"count key(_1) => count"})),
+TEST(SpecParserTest, Smoke) {
+  EXPECT_EQ(ToString(Parse("count key(_1) => count")),
             "count key(_1) => count");
 }
 
-TEST(SpecParser, MoreSpaces) {
-  EXPECT_EQ(ToString(Parse({"count( distinct,_1)  "})), "count(distinct, _1)");
+TEST(SpecParserTest, Sum) {
+  EXPECT_EQ(ToString(Parse("sum( _1 )")), "sum(_1)");
+  EXPECT_EQ(ToString(Parse("s2")), "sum(_2)");
 }
 
-TEST(SpecParser, ShortForms1) {
-  EXPECT_EQ(ToString(Parse({"c"})), "count");
+TEST(SpecParserTest, Min) {
+  EXPECT_EQ(ToString(Parse("min(_1)")), "min(_1)");
+  EXPECT_EQ(ToString(Parse("m2")), "min(_2)");
+  EXPECT_EQ(ToString(Parse("min(_1, _2, _3)")), "min(_1, _2, _3)");
 }
 
-TEST(SpecParser, ShortForms2) {
-  EXPECT_EQ(ToString(Parse({"c k1=>c"})), "count key(_1) => count");
+TEST(SpecParserTest, Max) {
+  EXPECT_EQ(ToString(Parse("max(_1)")), "max(_1)");
+  EXPECT_EQ(ToString(Parse("M2")), "max(_2)");
+  EXPECT_EQ(ToString(Parse("max(_1, _2, _3)")), "max(_1, _2, _3)");
 }
 
-TEST(SpecParser, ShortForms3) {
-  EXPECT_EQ(ToString(Parse({"f~AAPL c"})), "filter(_0~AAPL) count");
-  EXPECT_EQ(ToString(Parse({" f1~ AAPL"})), "filter(_1~AAPL) _0");
-  EXPECT_EQ(ToString(Parse({"f2 ~AAPL "})), "filter(_2~AAPL) _0");
+TEST(SpecParserTest, Count) {
+  EXPECT_EQ(ToString(Parse(" count ")), "count");
+  EXPECT_EQ(ToString(Parse("c")), "count");
 }
 
-TEST(SpecParser, ToString) {
+TEST(SpecParserTest, CountDistinct) {
+  EXPECT_EQ(ToString(Parse("count(distinct, _1)")), "count(distinct, _1)");
+  EXPECT_EQ(ToString(Parse("cd2")), "count(distinct, _2)");
+}
+
+TEST(SpecParserTest, Filter) {
+  EXPECT_EQ(ToString(Parse("filter(_1~AAPL)")), "filter(_1~AAPL) _0");
+  EXPECT_EQ(ToString(Parse("f~AAPL")), "filter(_0~AAPL) _0");
+  EXPECT_EQ(ToString(Parse(" f1~ AAPL")), "filter(_1~AAPL) _0");
+  EXPECT_EQ(ToString(Parse("f2 ~AAPL ")), "filter(_2~AAPL) _0");
+}
+
+TEST(SpecParserTest, MoreSpaces) {
+  EXPECT_EQ(ToString(Parse(" count( distinct,_1 )  ")), "count(distinct, _1)");
+}
+
+TEST(SpecParserTest, Pipeline) {
+  EXPECT_EQ(ToString(Parse("c=>c=>c")), "count => count => count");
+}
+
+TEST(SpecParserTest, ToString) {
   // Date when AAPL reached max price:
   Stage max_aapl = AggregatedTable{
       .filters = {Filter{.regexp = {.what = Expr{1}, .regexp = "AAPL"}}},
@@ -51,13 +75,13 @@ TEST(SpecParser, ToString) {
   EXPECT_EQ(ToString(num_tickers), "count(distinct, _1)");
 }
 
-TEST(SpecParser, Tmp) {
-  enum TokenType { END, PIPE, ID, OPAREN, CPAREN, COMMA, TILDE };
+TEST(SplitIntoTokensTest, Smoke) {
   std::vector<std::string_view> regexes = {
       "[ \t]+", "=>", "[_a-zA-Z][_a-zA-Z0-9]+", "\\(", "\\)", ",", "~",
   };
 
   using Expected = std::vector<std::pair<int, std::string_view>>;
+  // clang-format off
   Expected expected = {
     {2, "filter"},
     {3, "("},
@@ -77,9 +101,10 @@ TEST(SpecParser, Tmp) {
     {4, ")"},
     {0, " "},
   };
+  // clang-format on
   EXPECT_EQ(SplitIntoTokens("filter(_2~AAPL) => count(distinct, _1) ", regexes),
             expected);
 }
 
 }  // namespace
-}  // spec
+}  // namespace spec
