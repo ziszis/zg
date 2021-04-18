@@ -10,7 +10,9 @@ class StdoutOutputTable : public OutputTable {
  public:
   explicit StdoutOutputTable(int num_columns) : OutputTable(num_columns) {}
 
-  ~StdoutOutputTable() { Flush(); }
+  ~StdoutOutputTable() {
+    if (!buf_.empty()) LogicError("unfinished table");
+  }
 
   void EndLine() override {
     for (auto c : columns_) {
@@ -20,6 +22,8 @@ class StdoutOutputTable : public OutputTable {
     buf_.back() = '\n';
     if (buf_.size() > 1 << 15) Flush();
   }
+
+  void Finish() override { Flush(); }
 
   void Flush() {
     if (std::fwrite(buf_.data(), 1, buf_.size(), stdout) != buf_.size()) {
@@ -41,6 +45,8 @@ class PipeOutputTable : public OutputTable {
     row_.Reset(columns_);
     table_->PushRow(row_);
   }
+
+  void Finish() override { table_->Finish(); }
 
  private:
   std::unique_ptr<Table> table_;

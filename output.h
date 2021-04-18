@@ -14,6 +14,7 @@ class OutputTable {
 
   void Set(int column, std::string_view value) { columns_[column] = value; }
   virtual void EndLine() = 0;
+  virtual void Finish() = 0;
 
  protected:
   std::vector<std::string_view> columns_;

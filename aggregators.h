@@ -14,12 +14,15 @@ class CountAggregator {
   using State = int64_t;
   State Init(const InputRow&) const { return 1; }
   void Update(const InputRow&, State& state) const { ++state; }
-  void Print(State state, OutputBuffer* out) const {
-    absl::StrAppend(out->Column(column_), state);
+  void Print(State state, OutputTable& out) const {
+    buf_.clear();
+    absl::StrAppend(&buf_, state);
+    out.Set(column_, buf_);
   }
 
  private:
   int column_;
+  mutable std::string buf_;
 };
 
 class Numeric {
@@ -64,13 +67,16 @@ class SumAggregator {
   void Update(const InputRow& row, State& state) const {
     state.Add(row[field_]);
   }
-  void Print(State s, OutputBuffer* out) const {
-    s.Print(out->Column(column_));
+  void Print(State s, OutputTable& out) const {
+    buf_.clear();
+    s.Print(&buf_);
+    out.Set(column_, buf_);
   }
 
  private:
   int field_;
   int column_;
+  mutable std::string buf_;
 };
 
 template <class Value>
@@ -82,13 +88,16 @@ class MinAggregator {
   void Update(const InputRow& row, State& state) const {
     state.Min(row[field_]);
   }
-  void Print(State s, OutputBuffer* out) const {
-    s.Print(out->Column(column_));
+  void Print(State s, OutputTable& out) const {
+    buf_.clear();
+    s.Print(&buf_);
+    out.Set(column_, buf_);
   }
 
  private:
   int field_;
   int column_;
+  mutable std::string buf_;
 };
 
 template <class Value>
@@ -100,13 +109,16 @@ class MaxAggregator {
   void Update(const InputRow& row, State& state) const {
     state.Max(row[field_]);
   }
-  void Print(State s, OutputBuffer* out) const {
-    s.Print(out->Column(column_));
+  void Print(State s, OutputTable& out) const {
+    buf_.clear();
+    s.Print(&buf_);
+    out.Set(column_, buf_);
   }
 
  private:
   int field_;
   int column_;
+  mutable std::string buf_;
 };
 
 #endif  // GITHUB_ZISZIS_ZG_AGGREGATORS_INCLUDED
