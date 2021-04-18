@@ -6,6 +6,7 @@
 #include "multi-aggregation.h"
 #include "no-keys.h"
 #include "output.h"
+#include "simple-table.h"
 #include "single-key.h"
 
 using namespace spec;
@@ -143,7 +144,11 @@ std::unique_ptr<Table> TableFromSpec(const spec::AggregatedTable& spec,
 
 std::unique_ptr<Table> TableFromSpec(const spec::SimpleTable& spec,
                                      std::unique_ptr<Table> pipe_to) {
-  Unimplemented("spec::SimpleTable");
+  std::unique_ptr<OutputTable> output =
+      pipe_to ? MakePipeTable(spec.columns.size(), std::move(pipe_to))
+              : MakeStdoutTable(spec.columns.size());
+  return WrapFilter(spec.filters,
+                    MakeSimpleTable(spec.columns, std::move(output)));
 }
 
 }  // namespace

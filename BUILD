@@ -94,6 +94,7 @@ cc_library(
         ':multi-aggregation',
         ':no-keys',
         ':output',
+        ':simple-table',
         ':single-key',
         ':spec',
         ':table',
@@ -125,6 +126,17 @@ cc_test(
     deps = [
         ':spec',
         '@com_google_test//:gtest_main',
+    ],
+)
+
+cc_library(
+    name = 'simple-table',
+    hdrs = ['simple-table.h'],
+    srcs = ['simple-table.cc'],
+    deps = [
+        ':output',
+        ':spec',
+        ':table',
     ],
 )
 
