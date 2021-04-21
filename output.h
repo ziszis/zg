@@ -25,4 +25,6 @@ std::unique_ptr<OutputTable> MakeStdoutTable(int num_columns);
 std::unique_ptr<OutputTable> MakePipeTable(int num_columns,
                                            std::unique_ptr<Table> table);
 
+std::unique_ptr<Table> MakePassthroughTable();
+
 #endif  // GITHUB_ZISZIS_ZG_OUTPUT_INCLUDED

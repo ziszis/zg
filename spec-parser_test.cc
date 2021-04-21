@@ -6,7 +6,7 @@ namespace spec {
 namespace {
 
 TEST(SpecParserTest, Empty) {
-  EXPECT_EQ(ToString(Parse("")), "_0");
+  EXPECT_EQ(ToString(Parse("")), "");
 }
 
 TEST(SpecParserTest, Smoke) {
@@ -42,12 +42,12 @@ TEST(SpecParserTest, CountDistinct) {
 }
 
 TEST(SpecParserTest, Filter) {
-  EXPECT_EQ(ToString(Parse("filter(_1~FOO)")), "filter(_1~FOO) _0");
-  EXPECT_EQ(ToString(Parse("f~FOO")), "filter(_0~FOO) _0");
-  EXPECT_EQ(ToString(Parse(" f1~ FOO")), "filter(_1~FOO) _0");
-  EXPECT_EQ(ToString(Parse("f2 ~FOO ")), "filter(_2~FOO) _0");
-  EXPECT_EQ(ToString(Parse("f~'FOO'")), "filter(_0~FOO) _0");
-  EXPECT_EQ(ToString(Parse("f~'.*\\\\.US'")), "filter(_0~'.*\\\\.US') _0");
+  EXPECT_EQ(ToString(Parse("filter(_1~FOO)")), "filter(_1~FOO)");
+  EXPECT_EQ(ToString(Parse("f~FOO")), "filter(_0~FOO)");
+  EXPECT_EQ(ToString(Parse(" f1~ FOO")), "filter(_1~FOO)");
+  EXPECT_EQ(ToString(Parse("f2 ~FOO ")), "filter(_2~FOO)");
+  EXPECT_EQ(ToString(Parse("f~'FOO'")), "filter(_0~FOO)");
+  EXPECT_EQ(ToString(Parse("f~'.*\\\\.US'")), "filter(_0~'.*\\\\.US')");
 }
 
 TEST(SpecParserTest, MoreSpaces) {

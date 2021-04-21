@@ -196,7 +196,7 @@ class Parser : public Tokenizer {
     }
 
     if (agg.empty()) {
-      return SimpleTable{.columns = {Expr{.field = 0}}, .filters = filters};
+      return SimpleTable{.columns = {}, .filters = filters};
     } else {
       return AggregatedTable{.components = agg, .filters = filters};
     }

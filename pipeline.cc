@@ -144,6 +144,11 @@ std::unique_ptr<Table> TableFromSpec(const spec::AggregatedTable& spec,
 
 std::unique_ptr<Table> TableFromSpec(const spec::SimpleTable& spec,
                                      std::unique_ptr<Table> pipe_to) {
+  if (spec.columns.empty()) {
+    // We must be the last table, otherwise Optimize() should have fused us.
+    if (pipe_to) LogicError("implicit output inside the pipeline");
+    return WrapFilter(spec.filters, MakePassthroughTable());
+  }
   std::unique_ptr<OutputTable> output =
       pipe_to ? MakePipeTable(spec.columns.size(), std::move(pipe_to))
               : MakeStdoutTable(spec.columns.size());
@@ -151,10 +156,46 @@ std::unique_ptr<Table> TableFromSpec(const spec::SimpleTable& spec,
                     MakeSimpleTable(spec.columns, std::move(output)));
 }
 
+void MoveFilters(SimpleTable* from, Stage* to) {
+  struct {
+    auto operator()(AggregatedTable& t) { return &t.filters; }
+    auto operator()(SimpleTable& t) { return &t.filters; }
+  } v;
+  std::move(from->filters.begin(), from->filters.end(),
+            std::back_inserter(*std::visit(v, *to)));
+  from->filters.clear();
+}
+
+void OptimizeSpec(Pipeline* spec) {
+  // If a SimpleTable has no output columns, fuse its filters into the next
+  // stage.
+  for (int i = 0; i < spec->size(); ++i) {
+    if (SimpleTable* table = std::get_if<SimpleTable>(&(*spec)[i])) {
+      if (table->columns.empty() && i + 1 < spec->size()) {
+        MoveFilters(table, &(*spec)[i + 1]);
+      }
+    }
+  }
+
+  // Remove no-op tables.
+  spec->erase(std::remove_if(
+                  spec->begin(), spec->end(),
+                  [](const Stage& stage) {
+                    if (const auto* table = std::get_if<SimpleTable>(&stage)) {
+                      return table->columns.empty() && table->filters.empty();
+                    }
+                    return false;
+                  }),
+              spec->end());
+  if (spec->empty()) {
+    spec->push_back(SimpleTable{});
+  }
+}
+
 }  // namespace
 
-std::unique_ptr<Table> BuildPipeline(const spec::Pipeline& spec) {
-  if (spec.empty()) LogicError("empty spec");
+std::unique_ptr<Table> BuildPipeline(spec::Pipeline spec) {
+  OptimizeSpec(&spec);
   std::unique_ptr<Table> result;
   for (int i = spec.size(); i-- > 0;) {
     std::visit(

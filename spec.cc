@@ -89,8 +89,9 @@ std::string ToString(const AggregatedTable& table) {
 
 template <>
 std::string ToString(const SimpleTable& table) {
-  return absl::StrCat(ToString(table.filters, {.trailer = " "}),
-                      ToString(table.columns, {.delim = " "}));
+  return absl::StrCat(
+      ToString(table.filters, {.delim = " "}),
+      table.columns.empty() ? "" : ToString(table.columns, {.leader = " "}));
 }
 
 template <>
