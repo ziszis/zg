@@ -24,6 +24,7 @@ class NoKeyTable : public Table {
       aggregator_.Print(*value_, *output_);
       output_->EndLine();
       value_.reset();
+      aggregator_.Reset();
       output_->Finish();
     } else {
       Fail("No data to aggregate");

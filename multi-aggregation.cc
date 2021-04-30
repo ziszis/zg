@@ -55,6 +55,12 @@ class MultiAggregator {
     }
   }
 
+  void Reset() const {
+    for (const auto& f : fields_) {
+      f.aggregator->Reset();
+    }
+  }
+
  private:
   std::vector<AggregatorField> fields_;
 };

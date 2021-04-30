@@ -19,6 +19,7 @@ class CountAggregator {
     absl::StrAppend(&buf_, state);
     out.Set(column_, buf_);
   }
+  void Reset() const { buf_.clear(); }
 
  private:
   int column_;
@@ -72,6 +73,7 @@ class SumAggregator {
     s.Print(&buf_);
     out.Set(column_, buf_);
   }
+  void Reset() const { buf_.clear(); }
 
  private:
   int field_;
@@ -93,6 +95,7 @@ class MinAggregator {
     s.Print(&buf_);
     out.Set(column_, buf_);
   }
+  void Reset() const { buf_.clear(); }
 
  private:
   int field_;
@@ -114,6 +117,7 @@ class MaxAggregator {
     s.Print(&buf_);
     out.Set(column_, buf_);
   }
+  void Reset() const { buf_.clear(); }
 
  private:
   int field_;

@@ -15,9 +15,10 @@ class AggregatorInterface {
   virtual ~AggregatorInterface() {}
   virtual size_t StateSize() const = 0;
   virtual size_t StateAlign() const = 0;
-  virtual void Init(const InputRow& row, char* state) const = 0;
-  virtual void Update(const InputRow& row, char* state) const = 0;
+  virtual void Init(const InputRow& row, char* state) = 0;
+  virtual void Update(const InputRow& row, char* state) = 0;
   virtual void Print(const char* state, OutputTable&) const = 0;
+  virtual void Reset() = 0;
 };
 
 template <class A>
@@ -42,15 +43,16 @@ class AggregatorWrapper : public AggregatorInterface {
     static_assert(alignof(State) <= 8);
     return alignof(State);
   }
-  void Init(const InputRow& row, char* state) const override {
+  void Init(const InputRow& row, char* state) override {
     new (state) State(a_.Init(row));
   }
-  void Update(const InputRow& row, char* state) const override {
+  void Update(const InputRow& row, char* state) override {
     a_.Update(row, *reinterpret_cast<State*>(state));
   }
   void Print(const char* state, OutputTable& out) const override {
     a_.Print(*reinterpret_cast<const State*>(state), out);
   }
+  void Reset() override { a_.Reset(); }
 
  private:
   A a_;

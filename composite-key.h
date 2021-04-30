@@ -66,6 +66,7 @@ class CompositeKeyTable : public BaseCompositeKeyTable {
       output_->EndLine();
     }
     decltype(state_)().swap(state_);
+    aggregator_.Reset();
     output_->Finish();
   }
 
