@@ -53,30 +53,41 @@ std::unique_ptr<Table> BuildSingleAggregatorTable(
   }
 }
 
-auto AggregatorFromSpec(int column, const Key& s) -> CountAggregator {
+template <class Fn>
+auto AggregatorFromSpec(int column, const Key& k, Fn fn) {
   LogicError("key as aggregator");
+  return fn(CountAggregator(column));
 }
 
-auto AggregatorFromSpec(int column, const Sum& s) {
-  return SumAggregator<Numeric>(s.expr.field, column);
+template <class Fn>
+auto AggregatorFromSpec(int column, const Sum& s, Fn fn) {
+  return fn(SumAggregator<Numeric>(s.expr.field, column));
 }
 
-auto AggregatorFromSpec(int column, const Min& m) {
-  if (!m.output.empty()) Unimplemented("minarg");
-  return MinAggregator<Numeric>(m.what.field, column);
+template <class Fn>
+auto AggregatorFromSpec(int column, const Min& m, Fn fn) {
+  if (m.output.empty()) {
+    return fn(MinAggregator<Numeric>(m.what.field, column));
+  } else {
+    Unimplemented("multi-column minarg");
+  }
 }
 
-auto AggregatorFromSpec(int column, const Max& m) {
+template <class Fn>
+auto AggregatorFromSpec(int column, const Max& m, Fn fn) {
   if (!m.output.empty()) Unimplemented("maxarg");
-  return MaxAggregator<Numeric>(m.what.field, column);
+  return fn(MaxAggregator<Numeric>(m.what.field, column));
 }
 
-auto AggregatorFromSpec(int column, const Count&) {
-  return CountAggregator(column);
+template <class Fn>
+auto AggregatorFromSpec(int column, const Count&, Fn fn) {
+  return fn(CountAggregator(column));
 }
 
-auto AggregatorFromSpec(int column, const CountDistinct&) -> CountAggregator {
+template <class Fn>
+auto AggregatorFromSpec(int column, const CountDistinct&, Fn fn) {
   Unimplemented("count(distinct)");
+  return fn(CountAggregator(column));
 }
 
 std::unique_ptr<Table> AggregateFromSpec(
@@ -108,9 +119,10 @@ std::unique_ptr<Table> AggregateFromSpec(
       if (!std::holds_alternative<spec::Key>(cmp)) {
         return std::visit(
             [&](auto&& agg_spec) {
-              auto agg = AggregatorFromSpec(agg_column, agg_spec);
-              return BuildSingleAggregatorTable(std::move(keys), std::move(agg),
-                                                std::move(output));
+              return AggregatorFromSpec(agg_column, agg_spec, [&](auto&& agg) {
+                return BuildSingleAggregatorTable(
+                    std::move(keys), std::move(agg), std::move(output));
+              });
             },
             cmp);
       }
@@ -122,12 +134,14 @@ std::unique_ptr<Table> AggregateFromSpec(
     int agg_column = 0;
     for (const auto& cmp : components) {
       if (!std::holds_alternative<spec::Key>(cmp)) {
-        std::visit(
+        aggregators.push_back(std::visit(
             [&](auto&& agg_spec) {
-              auto agg = AggregatorFromSpec(agg_column, std::move(agg_spec));
-              aggregators.push_back(TypeErasedAggregator(std::move(agg)));
+              return AggregatorFromSpec(
+                  agg_column, std::move(agg_spec), [&](auto&& agg) {
+                    return TypeErasedAggregator(std::move(agg));
+                  });
             },
-            cmp);
+            cmp));
       }
       agg_column += NumColumns(cmp);
     }
