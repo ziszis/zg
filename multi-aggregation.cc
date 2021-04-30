@@ -13,8 +13,12 @@ struct AggregatorField {
 
 // A simple wrapper around char[size]. Needed because std::optional doesn't
 // allow naked arrays.
+//
+// alignas(8) can be relaxed if needed, but 1) it's not needed currently
+// useful, and 2) along with static_assert(alignof(State) <= 8)) guarantees
+// correct alignment of all states without complicating LayoutAggregatorState()
 template <int size>
-class Chars {
+class alignas(8) Chars {
  public:
   char& operator[](size_t offset) { return buf[offset]; }
   const char& operator[](size_t offset) const { return buf[offset]; }
@@ -60,19 +64,19 @@ std::pair<size_t, std::vector<AggregatorField>> LayoutAggregatorState(
   std::vector<AggregatorField> fields;
   for (std::unique_ptr<AggregatorInterface>& agg : aggs) {
     fields.emplace_back();
-    fields.back().state_offset = agg->StateSize();
     fields.back().aggregator = std::move(agg);
   }
   std::sort(fields.begin(), fields.end(), [](const auto& a, const auto& b) {
-    return a.state_offset > b.state_offset;
+    return a.aggregator->StateSize() > b.aggregator->StateSize();
   });
-  size_t size = 0;
+  size_t offset = 0;
   for (auto& f : fields) {
-    size_t this_size = f.state_offset;
-    f.state_offset = size;
-    size += this_size;
+    size_t align = f.aggregator->StateAlign();
+    offset = (offset + align - 1) / align * align;
+    f.state_offset = offset;
+    offset += f.aggregator->StateSize();
   }
-  return {size, std::move(fields)};
+  return {offset, std::move(fields)};
 }
 
 template <class Aggregator>

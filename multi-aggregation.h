@@ -14,6 +14,7 @@ class AggregatorInterface {
  public:
   virtual ~AggregatorInterface() {}
   virtual size_t StateSize() const = 0;
+  virtual size_t StateAlign() const = 0;
   virtual void Init(const InputRow& row, char* state) const = 0;
   virtual void Update(const InputRow& row, char* state) const = 0;
   virtual void Print(const char* state, OutputTable&) const = 0;
@@ -36,15 +37,13 @@ class AggregatorWrapper : public AggregatorInterface {
  public:
   using State = typename A::State;
   explicit AggregatorWrapper(A a) : a_(std::move(a)) {}
-  size_t StateSize() const override {
-    constexpr size_t size = sizeof(State);
-    // Aggregator state layout depends on state sizes of individual agg
-    static_assert((size & (size - 1)) == 0);
-    static_assert(size % alignof(State) == 0);
-    return size;
+  size_t StateSize() const override { return sizeof(State); }
+  size_t StateAlign() const override {
+    static_assert(alignof(State) <= 8);
+    return alignof(State);
   }
   void Init(const InputRow& row, char* state) const override {
-    *reinterpret_cast<State*>(state) = a_.Init(row);
+    new (state) State(a_.Init(row));
   }
   void Update(const InputRow& row, char* state) const override {
     a_.Update(row, *reinterpret_cast<State*>(state));
