@@ -173,6 +173,17 @@ cc_test(
 )
 
 cc_library(
+    name = 'storage',
+    hdrs = ['storage.h'],
+    srcs = ['storage.cc'],
+    deps = [
+        ':base',
+        ':expr',
+        ':varint',
+    ],
+)
+
+cc_library(
     name = 'table',
     hdrs = ['table.h'],
     deps = [
