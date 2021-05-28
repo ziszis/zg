@@ -2,6 +2,7 @@
 
 #include "aggregators.h"
 #include "composite-key.h"
+#include "expr.h"
 #include "filter-table.h"
 #include "multi-aggregation.h"
 #include "no-keys.h"
@@ -61,13 +62,13 @@ auto AggregatorFromSpec(int column, const Key& k, Fn fn) {
 
 template <class Fn>
 auto AggregatorFromSpec(int column, const Sum& s, Fn fn) {
-  return fn(SumAggregator<Numeric>(s.expr.field, column));
+  return fn(SumAggregator<Numeric>(ExprColumn<Numeric>(column, s.expr)));
 }
 
 template <class Fn>
 auto AggregatorFromSpec(int column, const Min& m, Fn fn) {
   if (m.output.empty()) {
-    return fn(MinAggregator<Numeric>(m.what.field, column));
+    return fn(MinAggregator<Numeric>(ExprColumn<Numeric>(column, m.what)));
   } else {
     Unimplemented("multi-column minarg");
   }
@@ -76,7 +77,7 @@ auto AggregatorFromSpec(int column, const Min& m, Fn fn) {
 template <class Fn>
 auto AggregatorFromSpec(int column, const Max& m, Fn fn) {
   if (!m.output.empty()) Unimplemented("maxarg");
-  return fn(MaxAggregator<Numeric>(m.what.field, column));
+  return fn(MaxAggregator<Numeric>(ExprColumn<Numeric>(column, m.what)));
 }
 
 template <class Fn>

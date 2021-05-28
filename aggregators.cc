@@ -9,50 +9,55 @@ inline bool SumOverflows(V a, V b) {
          (a < 0 && b > std::numeric_limits<V>::lowest() - a);
 }
 
+inline double AsDouble(std::variant<int64_t, double> n) {
+  return std::visit([](auto v) { return static_cast<double>(v); }, n);
+}
+
 }  // namespace
 
 Numeric Numeric::Make(FieldValue field) {
-  if (std::optional<int64_t> that = TryParseAs<int64_t>(field)) {
-    return Numeric(*that);
-  } else {
+  std::string_view f = field;
+  if (std::any_of(f.begin(), f.end(),
+                  [](char c) { return c == '.' || c == 'e' || c == 'E'; })) {
     return Numeric(ParseAs<double>(field));
+  } else {
+    return Numeric(ParseAs<int64_t>(field));
   }
 }
 
-void Numeric::Add(FieldValue field) {
-  if (std::holds_alternative<int64_t>(v_)) {
-    if (std::optional<int64_t> that = TryParseAs<int64_t>(field)) {
-      int64_t& current = std::get<int64_t>(v_);
-      if (!SumOverflows(current, *that)) {
-        current += *that;
+void Numeric::Add(Numeric field) {
+  if (int64_t* current = std::get_if<int64_t>(&v_)) {
+    if (int64_t* that = std::get_if<int64_t>(&field.v_)) {
+      if (!SumOverflows(*current, *that)) {
+        *current += *that;
         return;
       }
     }
-    v_ = static_cast<double>(std::get<int64_t>(v_));
+    v_ = static_cast<double>(*current);
   }
-  std::get<double>(v_) += ParseAs<double>(field);
+  std::get<double>(v_) += AsDouble(field.v_);
 }
 
-void Numeric::Min(FieldValue field) {
-  if (std::holds_alternative<int64_t>(v_)) {
-    if (std::optional<int64_t> that = TryParseAs<int64_t>(field)) {
-      std::get<int64_t>(v_) = std::min(std::get<int64_t>(v_), *that);
+void Numeric::Min(Numeric field) {
+  if (int64_t* current = std::get_if<int64_t>(&v_)) {
+    if (int64_t* that = std::get_if<int64_t>(&field.v_)) {
+      *current = std::min(*current, *that);
       return;
     }
-    v_ = static_cast<double>(std::get<int64_t>(v_));
+    v_ = static_cast<double>(*current);
   }
-  std::get<double>(v_) = std::min(std::get<double>(v_), ParseAs<double>(field));
+  std::get<double>(v_) = std::min(std::get<double>(v_), AsDouble(field.v_));
 }
 
-void Numeric::Max(FieldValue field) {
-  if (std::holds_alternative<int64_t>(v_)) {
-    if (std::optional<int64_t> that = TryParseAs<int64_t>(field)) {
-      std::get<int64_t>(v_) = std::max(std::get<int64_t>(v_), *that);
+void Numeric::Max(Numeric field) {
+  if (int64_t* current = std::get_if<int64_t>(&v_)) {
+    if (int64_t* that = std::get_if<int64_t>(&field.v_)) {
+      *current = std::max(*current, *that);
       return;
     }
-    v_ = static_cast<double>(std::get<int64_t>(v_));
+    v_ = static_cast<double>(*current);
   }
-  std::get<double>(v_) = std::max(std::get<double>(v_), ParseAs<double>(field));
+  std::get<double>(v_) = std::max(std::get<double>(v_), AsDouble(field.v_));
 }
 
 void Numeric::Print(std::string* out) const {

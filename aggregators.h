@@ -5,6 +5,7 @@
 #include <variant>
 
 #include "absl/strings/str_cat.h"
+#include "expr.h"
 #include "output.h"
 #include "types.h"
 
@@ -19,7 +20,7 @@ class CountAggregator {
     absl::StrAppend(&buf_, state);
     out.Set(column_, buf_);
   }
-  void Reset() const { buf_.clear(); }
+  void Reset() const { decltype(buf_)().swap(buf_); }
 
  private:
   int column_;
@@ -30,9 +31,9 @@ class Numeric {
  public:
   static Numeric Make(FieldValue);
 
-  void Add(FieldValue);
-  void Min(FieldValue);
-  void Max(FieldValue);
+  void Add(Numeric);
+  void Min(Numeric);
+  void Max(Numeric);
   void Print(std::string*) const;
 
  private:
@@ -41,88 +42,32 @@ class Numeric {
   std::variant<int64_t, double> v_;
 };
 
-template <class V>
-class NativeNum {
+template<class Value, void(Value::*fn)(Value)>
+class GenericAggregator {
  public:
-  static NativeNum Make(const FieldValue& field) {
-    return NativeNum(ParseAs<V>(field));
-  }
+  using State = Value;
+  explicit GenericAggregator(ExprColumn<Value> expr) : expr_(expr) {}
 
-  void Add(const FieldValue& field) { v_ += ParseAs<V>(field); }
-  void Min(const FieldValue& field) { v_ = std::min(v_, ParseAs<V>(field)); }
-  void Max(const FieldValue& field) { v_ = std::max(v_, ParseAs<V>(field)); }
-  void Print(std::string* out) const { absl::StrAppend(out, v_); }
+  State Init(const InputRow& row) const { return expr_.Eval(row); }
+  void Update(const InputRow& row, State& state) const {
+    (state.*fn)(expr_.Eval(row));
+  }
+  void Print(State s, OutputTable& out) const { expr_.Print(s, out); }
+  void Reset() const { expr_.Reset(); }
 
  private:
-  explicit NativeNum(V v) : v_(v) {}
-  V v_;
+  ExprColumn<Value> expr_;
 };
 
 template <class Value>
-class SumAggregator {
- public:
-  using State = Value;
-  SumAggregator(int field, int column) : field_(field), column_(column) {}
-
-  State Init(const InputRow& row) const { return State::Make(row[field_]); }
-  void Update(const InputRow& row, State& state) const {
-    state.Add(row[field_]);
-  }
-  void Print(State s, OutputTable& out) const {
-    buf_.clear();
-    s.Print(&buf_);
-    out.Set(column_, buf_);
-  }
-  void Reset() const { buf_.clear(); }
-
- private:
-  int field_;
-  int column_;
-  mutable std::string buf_;
-};
+using SumAggregator = GenericAggregator<Value, &Value::Add>;
 
 template <class Value>
-class MinAggregator {
- public:
-  using State = Value;
-  MinAggregator(int field, int column) : field_(field), column_(column) {}
-  State Init(const InputRow& row) const { return State::Make(row[field_]); }
-  void Update(const InputRow& row, State& state) const {
-    state.Min(row[field_]);
-  }
-  void Print(State s, OutputTable& out) const {
-    buf_.clear();
-    s.Print(&buf_);
-    out.Set(column_, buf_);
-  }
-  void Reset() const { buf_.clear(); }
-
- private:
-  int field_;
-  int column_;
-  mutable std::string buf_;
-};
+using MinAggregator = GenericAggregator<Value, &Value::Min>;
 
 template <class Value>
-class MaxAggregator {
- public:
-  using State = Value;
-  MaxAggregator(int field, int column) : field_(field), column_(column) {}
-  State Init(const InputRow& row) const { return State::Make(row[field_]); }
-  void Update(const InputRow& row, State& state) const {
-    state.Max(row[field_]);
-  }
-  void Print(State s, OutputTable& out) const {
-    buf_.clear();
-    s.Print(&buf_);
-    out.Set(column_, buf_);
-  }
-  void Reset() const { buf_.clear(); }
+using MaxAggregator = GenericAggregator<Value, &Value::Max>;
 
- private:
-  int field_;
-  int column_;
-  mutable std::string buf_;
-};
+
 
 #endif  // GITHUB_ZISZIS_ZG_AGGREGATORS_INCLUDED
