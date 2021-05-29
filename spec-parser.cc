@@ -4,6 +4,7 @@
 #include <regex>
 
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_split.h"
 #include "base.h"
 
 namespace spec {
@@ -179,10 +180,12 @@ class Parser : public Tokenizer {
         agg.push_back(Key{*expr});
       } else if (auto expr = TryShortForm("s")) {
         agg.push_back(Sum{*expr});
-      } else if (auto expr = TryShortForm("m")) {
-        agg.push_back(Min{*expr});
-      } else if (auto expr = TryShortForm("M")) {
-        agg.push_back(Max{*expr});
+      } else if (auto exprs = TryMultiArgShortForm("m")) {
+        agg.push_back(Min{.what = *exprs->begin(),
+                          .output{exprs->begin() + 1, exprs->end()}});
+      } else if (auto exprs = TryMultiArgShortForm("M")) {
+        agg.push_back(Max{.what = *exprs->begin(),
+                          .output{exprs->begin() + 1, exprs->end()}});
       } else if (auto expr = TryShortForm("cd")) {
         agg.push_back(CountDistinct{*expr});
       } else if (auto expr = TryShortForm("f")) {
@@ -269,18 +272,30 @@ class Parser : public Tokenizer {
   }
 
   std::optional<Expr> TryShortForm(std::string_view shortform) {
+    std::optional<std::vector<Expr>> exprs = TryMultiArgShortForm(shortform);
+    if (exprs.has_value() && exprs->size() == 1) {
+      return *exprs->begin();
+    }
+    return std::nullopt;
+  }
+
+  std::optional<std::vector<Expr>> TryMultiArgShortForm(
+      std::string_view shortform) {
     Token token = Peek();
     if (token.type != ID || !token.value.starts_with(shortform) ||
         token.value == shortform) {
       return std::nullopt;
     }
     Consume(ID);
-    int index = 0;
-    if (absl::SimpleAtoi(token.value.substr(shortform.size()), &index)) {
-      return Expr{.field = index};
-    } else {
-      return std::nullopt;
+    token.value.remove_prefix(shortform.size());
+
+    std::vector<Expr> result;
+    for (std::string_view field : absl::StrSplit(token.value, '_')) {
+      int index = 0;
+      if (!absl::SimpleAtoi(field, &index)) return std::nullopt;
+      result.push_back(Expr{.field = index});
     }
+    return result;
   }
 };
 

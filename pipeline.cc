@@ -70,14 +70,21 @@ auto AggregatorFromSpec(int column, const Min& m, Fn fn) {
   if (m.output.empty()) {
     return fn(MinAggregator<Numeric>(ExprColumn<Numeric>(column, m.what)));
   } else {
-    Unimplemented("multi-column minarg");
+    return fn(ArgMinAggregator<Numeric>(
+        ::Expr<Numeric>::FromSpec(m.what),
+        ExprColumn<std::string_view>::FromSpecs(column, m.output)));
   }
 }
 
 template <class Fn>
 auto AggregatorFromSpec(int column, const Max& m, Fn fn) {
-  if (!m.output.empty()) Unimplemented("maxarg");
-  return fn(MaxAggregator<Numeric>(ExprColumn<Numeric>(column, m.what)));
+  if (m.output.empty()) {
+    return fn(MaxAggregator<Numeric>(ExprColumn<Numeric>(column, m.what)));
+  } else {
+    return fn(ArgMaxAggregator<Numeric>(
+        ::Expr<Numeric>::FromSpec(m.what),
+        ExprColumn<std::string_view>::FromSpecs(column, m.output)));
+  }
 }
 
 template <class Fn>

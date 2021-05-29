@@ -23,12 +23,16 @@ TEST(SpecParserTest, Min) {
   EXPECT_EQ(ToString(Parse("min(_1)")), "min(_1)");
   EXPECT_EQ(ToString(Parse("m2")), "min(_2)");
   EXPECT_EQ(ToString(Parse("min(_1, _2, _3)")), "min(_1, _2, _3)");
+  EXPECT_EQ(ToString(Parse("m2_3")), "min(_2, _3)");
+  EXPECT_EQ(ToString(Parse("m2_3_2")), "min(_2, _3, _2)");
 }
 
 TEST(SpecParserTest, Max) {
   EXPECT_EQ(ToString(Parse("max(_1)")), "max(_1)");
   EXPECT_EQ(ToString(Parse("M2")), "max(_2)");
   EXPECT_EQ(ToString(Parse("max(_1, _2, _3)")), "max(_1, _2, _3)");
+  EXPECT_EQ(ToString(Parse("M2_3")), "max(_2, _3)");
+  EXPECT_EQ(ToString(Parse("M2_3_2")), "max(_2, _3, _2)");
 }
 
 TEST(SpecParserTest, Count) {
