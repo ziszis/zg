@@ -1,5 +1,7 @@
 #include "storage.h"
 
+#include <cstring>
+
 #include "varint.h"
 
 // TODO(zis): Make handles 8 bytes and implement SSO for small values?

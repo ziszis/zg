@@ -182,10 +182,10 @@ class Parser : public Tokenizer {
         agg.push_back(Sum{*expr});
       } else if (auto exprs = TryMultiArgShortForm("m")) {
         agg.push_back(Min{.what = *exprs->begin(),
-                          .output{exprs->begin() + 1, exprs->end()}});
+                          .output = {exprs->begin() + 1, exprs->end()}});
       } else if (auto exprs = TryMultiArgShortForm("M")) {
         agg.push_back(Max{.what = *exprs->begin(),
-                          .output{exprs->begin() + 1, exprs->end()}});
+                          .output = {exprs->begin() + 1, exprs->end()}});
       } else if (auto expr = TryShortForm("cd")) {
         agg.push_back(CountDistinct{*expr});
       } else if (auto expr = TryShortForm("f")) {
@@ -262,13 +262,13 @@ class Parser : public Tokenizer {
     Consume(TILDE);
     std::string regexp = ConsumeString("regexp");
     Consume(CPAREN);
-    return Filter{.regexp{what, regexp}};
+    return Filter{.regexp = {what, regexp}};
   }
 
   Filter ParseShortFilter(Expr what) {
     Consume(TILDE);
     std::string regexp = ConsumeString("regexp");
-    return Filter{.regexp{what, regexp}};
+    return Filter{.regexp = {what, regexp}};
   }
 
   std::optional<Expr> TryShortForm(std::string_view shortform) {
